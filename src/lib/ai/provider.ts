@@ -11,7 +11,8 @@ import { env } from "../env";
 
 const DEFAULT_CHAINS = {
   anthropic: ["claude-sonnet-5-5", "claude-haiku-4-5"],
-  google: ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"],
+  // Flash-Lite plans correctly in ~1.5 s; full Flash takes ~10 s, so it's the fallback.
+  google: ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.8-flash"],
   openai: ["gpt-4.1-mini"],
 } as const;
 

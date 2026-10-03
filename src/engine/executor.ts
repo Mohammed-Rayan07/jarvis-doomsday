@@ -21,9 +21,13 @@ let controller: AbortController | undefined;
 let priorityNext: string | undefined;
 let attachments: File[] = [];
 const waiters = new Map<string, (v: InteractionOutcome) => void>();
+/** Step results per command, so templates still resolve when a step is retried later. */
+const commandResults = new Map<string, Record<string, ToolResult>>();
+/** Commands where Tony chose "Authorise all" — remaining non-destructive steps skip the card. */
+const approveAll = new Set<string>();
 
 export type InteractionOutcome =
-  | { type: "approve"; args?: Record<string, unknown> }
+  | { type: "approve"; args?: Record<string, unknown>; all?: boolean }
   | { type: "skip" }
   | { type: "cancel" }
   | { type: "done"; result: ToolResult };
@@ -52,18 +56,20 @@ export function submit(text: string, files: File[] = [], opts: { interrupt?: boo
   const trimmed = text.trim();
   if (!trimmed && files.length === 0) return;
 
-  q.pushMessage({ id: nanoid(), role: "user", text: trimmed || `📎 ${files.map((f) => f.name).join(", ")}`, at: nowIso() });
+  const userText = trimmed || `📎 ${files.map((f) => f.name).join(", ")}`;
   if (files.length) attachments = files;
 
   // Clarification answer → re-plan the pending command with history.
   if (q.awaitingInputFor) {
     const id = q.awaitingInputFor;
     q.setAwaitingInput(undefined);
+    q.pushMessage({ id: nanoid(), role: "user", text: userText, at: nowIso(), commandId: id });
     void run(id, trimmed);
     return;
   }
 
   const cmd: Command = { id: `cmd_${nanoid(6)}`, text: trimmed, status: "queued", steps: [], createdAt: nowIso() };
+  q.pushMessage({ id: nanoid(), role: "user", text: userText, at: nowIso(), commandId: cmd.id });
   q.addCommand(cmd);
 
   const busy = Boolean(q.currentId);
@@ -81,10 +87,25 @@ export function interrupt(reason = "Operation cancelled, sir.") {
   useQueue.getState().pushMessage({ id: nanoid(), role: "jarvis", text: reason, at: nowIso(), kind: "summary" });
 }
 
-function history(): ChatTurn[] {
-  return useQueue
-    .getState()
-    .messages.slice(-12)
+/**
+ * Conversation context for planning `commandId`: everything before this command's latest
+ * user turn, minus turns from commands still waiting in the queue (they haven't happened yet,
+ * and would otherwise leak into this plan).
+ */
+function history(commandId: string): ChatTurn[] {
+  const { messages, commands } = useQueue.getState();
+  const queued = new Set(commands.filter((c) => c.status === "queued" && c.id !== commandId).map((c) => c.id));
+  let end = messages.length;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user" && messages[i].commandId === commandId) {
+      end = i;
+      break;
+    }
+  }
+  return messages
+    .slice(0, end)
+    .filter((m) => !(m.commandId && queued.has(m.commandId)))
+    .slice(-12)
     .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
 }
 
@@ -105,7 +126,7 @@ async function run(commandId: string, clarificationAnswer?: string) {
       body: JSON.stringify({
         // Combine original order + answer so the backup brain (no history) can complete it too.
         text: clarificationAnswer ? `${cmd.text} ${clarificationAnswer}` : cmd.text,
-        history: history().slice(0, -1),
+        history: history(commandId),
         tz: tz(),
         now: nowIso(),
         attachments: attachments.map((f) => ({ name: f.name, type: f.type, size: f.size })),
@@ -140,32 +161,8 @@ async function run(commandId: string, clarificationAnswer?: string) {
     const steps: StepRun[] = plan.steps.map((s) => ({ ...s, status: "pending" }));
     q.updateCommand(commandId, { status: "running", plan, steps });
 
-    const results: Record<string, ToolResult> = {};
-    let failed = false;
-    for (const step of steps) {
-      if (signal.aborted || failed) {
-        q.updateStep(commandId, step.id, { status: signal.aborted ? "cancelled" : "skipped" });
-        continue;
-      }
-      const outcome = await runStep(commandId, step, results, signal);
-      if (outcome === "cancelled") continue;
-      if (outcome && !outcome.ok) failed = true;
-    }
-
-    const final = useQueue.getState().commands.find((c) => c.id === commandId)!;
-    const done = final.steps.filter((s) => s.status === "done").length;
-    const status = signal.aborted ? "cancelled" : done === final.steps.length ? "done" : done > 0 ? "partial" : "failed";
-    q.updateCommand(commandId, { status, finishedAt: nowIso() });
-    if (final.steps.length > 1 || status !== "done") {
-      q.pushMessage({
-        id: nanoid(),
-        role: "jarvis",
-        text: `${done} of ${final.steps.length} operations completed${status === "done" ? ". All systems nominal, sir." : "."}`,
-        at: nowIso(),
-        commandId,
-        kind: "summary",
-      });
-    }
+    commandResults.set(commandId, {});
+    await executeSteps(commandId, 0, signal);
   } catch (err) {
     const aborted = signal.aborted;
     q.updateCommand(commandId, { status: aborted ? "cancelled" : "failed", finishedAt: nowIso() });
@@ -183,6 +180,75 @@ async function run(commandId: string, clarificationAnswer?: string) {
   finish(commandId);
 }
 
+/** Run a command's steps from `startIndex`, stopping at the first failure (later steps → skipped). */
+async function executeSteps(commandId: string, startIndex: number, signal: AbortSignal) {
+  const q = useQueue.getState();
+  const results = commandResults.get(commandId) ?? {};
+  commandResults.set(commandId, results);
+  const steps = q.commands.find((c) => c.id === commandId)?.steps ?? [];
+
+  let failed = false;
+  for (const step of steps.slice(startIndex)) {
+    if (signal.aborted || failed) {
+      q.updateStep(commandId, step.id, { status: signal.aborted ? "cancelled" : "skipped" });
+      continue;
+    }
+    const current = useQueue.getState().commands.find((c) => c.id === commandId)?.steps.find((s) => s.id === step.id) ?? step;
+    const outcome = await runStep(commandId, current, results, signal);
+    if (outcome === "cancelled") continue;
+    if (outcome && !outcome.ok) failed = true;
+  }
+
+  const final = useQueue.getState().commands.find((c) => c.id === commandId)!;
+  const done = final.steps.filter((s) => s.status === "done").length;
+  const status = signal.aborted ? "cancelled" : done === final.steps.length ? "done" : done > 0 ? "partial" : "failed";
+  q.updateCommand(commandId, { status, finishedAt: nowIso() });
+  if (final.steps.length > 1 || status !== "done") {
+    const failedStep = final.steps.find((s) => s.status === "failed");
+    q.pushMessage({
+      id: nanoid(),
+      role: "jarvis",
+      text:
+        status === "done"
+          ? `${done} of ${final.steps.length} operations completed. All systems nominal, sir.`
+          : status === "cancelled"
+            ? `Stood down. ${done} of ${final.steps.length} operations had completed before the interrupt.`
+            : `${done} of ${final.steps.length} operations completed.${failedStep ? ` "${failedStep.summary}" failed — ${failedStep.result?.message ?? "see above"}` : ""}`,
+      at: nowIso(),
+      commandId,
+      kind: status === "done" ? "summary" : "error",
+    });
+  }
+  approveAll.delete(commandId);
+}
+
+/**
+ * Retry a failed step (optionally with corrected args, e.g. a different recipient) and
+ * continue with the steps that were skipped after it. Runs as the current command.
+ */
+export async function retryStep(commandId: string, stepId: string, patch: Record<string, unknown> = {}) {
+  const q = useQueue.getState();
+  if (q.currentId) {
+    q.pushMessage({ id: nanoid(), role: "jarvis", text: "One moment, sir — I'm still busy with the current operation.", at: nowIso(), kind: "summary" });
+    return;
+  }
+  const cmd = q.commands.find((c) => c.id === commandId);
+  const index = cmd?.steps.findIndex((s) => s.id === stepId) ?? -1;
+  if (!cmd || index < 0) return;
+  const step = cmd.steps[index];
+  q.updateStep(commandId, stepId, { status: "pending", result: undefined, args: { ...step.args, ...patch } });
+  for (const s of cmd.steps.slice(index + 1)) if (s.status === "skipped") q.updateStep(commandId, s.id, { status: "pending" });
+
+  controller = new AbortController();
+  q.setCurrent(commandId);
+  q.updateCommand(commandId, { status: "running" });
+  try {
+    await executeSteps(commandId, index, controller.signal);
+  } finally {
+    finish(commandId);
+  }
+}
+
 async function runStep(
   commandId: string,
   step: StepRun,
@@ -195,7 +261,9 @@ async function runStep(
 
   // Confirmation gate (BUILD_SPEC §5, 5.2)
   const autoApproved =
-    (!meta.consequential && q.autoApprove.reads) || (step.tool.startsWith("reminders.") && !meta.danger && q.autoApprove.reminders);
+    (!meta.consequential && q.autoApprove.reads) ||
+    (step.tool.startsWith("reminders.") && !meta.danger && q.autoApprove.reminders) ||
+    (approveAll.has(commandId) && !meta.danger);
   if (meta.consequential && !meta.interactive && !autoApproved) {
     q.updateStep(commandId, step.id, { status: "awaiting_confirmation", args });
     const o = await waitForInteraction(commandId, step.id, "confirm", signal);
@@ -209,6 +277,7 @@ async function runStep(
       return undefined;
     }
     if (o.type === "approve" && o.args) args = o.args;
+    if (o.type === "approve" && o.all) approveAll.add(commandId);
   }
 
   q.updateStep(commandId, step.id, { status: "running", startedAt: nowIso(), args });

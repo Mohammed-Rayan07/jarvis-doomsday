@@ -2,7 +2,7 @@ import "server-only";
 import { OAuth2Client } from "google-auth-library";
 import { env, googleConfigured } from "../env";
 import { errors } from "../errors";
-import { readGoogleSession, writeGoogleSession } from "../session";
+import { clearGoogleSession, readGoogleSession, writeGoogleSession } from "../session";
 
 // BUILD_SPEC §8.1
 
@@ -48,6 +48,10 @@ export async function getGoogleClient() {
 export function mapGoogleError(err: unknown): unknown {
   const e = err as { message?: string; code?: number | string; status?: number; response?: { status?: number } };
   const status = e?.response?.status ?? e?.status ?? (typeof e?.code === "number" ? e.code : undefined);
-  if (e?.message?.includes("invalid_grant") || status === 401) return errors.authExpired("google");
+  if (e?.message?.includes("invalid_grant") || status === 401) {
+    // Revoked / expired refresh token: drop the dead cookie so the UI shows "Connect Google" again.
+    void clearGoogleSession().catch(() => undefined);
+    return errors.authExpired("google");
+  }
   return err;
 }

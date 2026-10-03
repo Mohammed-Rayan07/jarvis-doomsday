@@ -1,6 +1,6 @@
 import "server-only";
 import type { ToolName, ToolResult } from "../types";
-import { toolSchemas, toolMeta, type ToolArgs } from "./schemas";
+import { toolSchemas, type ToolArgs } from "./schemas";
 import { failure, JarvisError } from "../errors";
 import * as calendar from "../google/calendar";
 import * as drive from "../google/drive";
@@ -122,15 +122,31 @@ const handlers: { [T in ToolName]: Handler<T> } = {
   "system.status": async () => ({ ok: true, message: "All systems reporting, sir." }),
 };
 
+// Plain-English prompts for missing/invalid fields (BUILD_SPEC 5.2 "required field missing").
+const FIELD_QUESTIONS: Record<string, string> = {
+  title: "What should I call the event, sir?",
+  start: "I need a valid start date and time for that event, sir.",
+  end: "That end time doesn't look right, sir.",
+  attendees: "One of those attendee emails isn't valid, sir.",
+  eventId: "Which event do you mean, sir?",
+  text: "What should the message say, sir?",
+  recipient: "Who should receive it, sir?",
+  dueAt: "When should I remind you, sir?",
+  until: "Until when should I snooze it, sir?",
+  id: "Which item do you mean, sir?",
+  query: "What should I search the archive for, sir?",
+  name: "What should the folder be called, sir?",
+};
+
 export async function executeTool(tool: ToolName, rawArgs: unknown, ctx: Ctx): Promise<ToolResult> {
   const schema = toolSchemas[tool];
   if (!schema) return failure(new JarvisError("VALIDATION", `Unknown tool ${tool}`));
   const parsed = schema.safeParse(rawArgs ?? {});
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
+    const field = String(parsed.error.issues[0]?.path[0] ?? "");
     return failure(
-      new JarvisError("MISSING_FIELD", `I need a valid ${issue?.path.join(".") || "input"} for ${toolMeta[tool].description.toLowerCase()}, sir.`, {
-        details: parsed.error.issues,
+      new JarvisError("MISSING_FIELD", FIELD_QUESTIONS[field] ?? `Something's missing for that request (${field || "input"}), sir.`, {
+        details: { field, issues: parsed.error.issues },
       }),
     );
   }
