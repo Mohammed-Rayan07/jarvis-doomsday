@@ -9,6 +9,7 @@ interface PreviewState {
   highlightId?: string;
   driveMode: "browse" | "search";
   driveQuery?: string;
+  driveFolderId?: string;
   /** bump per tab to make views refetch */
   version: Record<PreviewTab, number>;
   /** mobile: unseen change badge */
@@ -17,6 +18,8 @@ interface PreviewState {
   focus: (f: PreviewFocus) => void;
   refresh: (tab: PreviewTab) => void;
   clearHighlight: () => void;
+  openFolder: (id: string) => void;
+  exitSearch: () => void;
   markSeen: () => void;
 }
 
@@ -32,10 +35,13 @@ export const usePreview = create<PreviewState>((set) => ({
       highlightId: f.highlightId,
       driveMode: f.tab === "drive" ? (f.mode ?? "browse") : s.driveMode,
       driveQuery: f.tab === "drive" ? f.query : s.driveQuery,
+      driveFolderId: f.tab === "drive" && f.folderId ? f.folderId : s.driveFolderId,
       version: { ...s.version, [f.tab]: s.version[f.tab] + 1, log: s.version.log + 1 },
       unseen: true,
     })),
   refresh: (tab) => set((s) => ({ version: { ...s.version, [tab]: s.version[tab] + 1 } })),
   clearHighlight: () => set({ highlightId: undefined }),
+  openFolder: (id) => set({ driveFolderId: id, driveMode: "browse", highlightId: undefined }),
+  exitSearch: () => set({ driveMode: "browse", driveQuery: undefined }),
   markSeen: () => set({ unseen: false }),
 }));

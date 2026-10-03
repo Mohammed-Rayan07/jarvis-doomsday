@@ -426,6 +426,8 @@ Viewports: 1440×900, 1024×768, 390×844.
 ## 13. Progress log & known TODOs
 
 **Done (verified in browser):** P1 core loop on Gemini (fallback chain + minimal thinking, 1–3 s plans) · P2 Google OAuth round-trip + Calendar create/list/update/delete + Calendar preview (7-day agenda, NOW marker, reminders overlaid in gold, highlight) · P3 Reminders view (overdue/today/upcoming/done, done/snooze/delete) + watcher (toast, notification, voice, Telegram ping to owner) · P5 (code) Telegram contacts sync/resolve/send + Comms view (history table + contact grid, invite link, owner star) — awaiting real contacts.
+P4 Drive (verified with real account): explorer with breadcrumbs/back, search (all-keywords-in-name → fullText → any-keyword) with name/type/folder path/modified/open link, UploadCard (attach/pick/drop, folder picker with full paths, new folder, default My Drive, resumable session + direct XHR PUT with % / bytes / speed, verify, cancel, retry, proxy fallback).
+**Gemini thinking:** Flash-Lite accepts `minimal`, Flash models only `low` — set per model (planning 1.5–2.7 s).
 **Planner guard:** same-day past times roll forward to tomorrow (models ignore the prompt rule).
 
 ### Original skeleton status (commit `b8a1f54`)

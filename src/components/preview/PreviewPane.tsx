@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { CalendarView } from "./CalendarView";
 import { RemindersView } from "./RemindersView";
 import { CommsView } from "./CommsView";
+import { DriveView } from "./DriveView";
 
 // LIVE INTEGRATION PREVIEW PANE (BUILD_SPEC 1.1, §9). Each view is filled in its phase:
 // Calendar P2 · Reminders P3 · Archive P4 · Comms P5. LOG works now.
@@ -46,6 +47,8 @@ export function PreviewPane() {
           <CalendarView />
         ) : tab === "reminders" ? (
           <RemindersView />
+        ) : tab === "drive" ? (
+          <DriveView />
         ) : tab === "comms" ? (
           <CommsView />
         ) : tab === "log" ? (

@@ -91,17 +91,19 @@ const handlers: { [T in ToolName]: Handler<T> } = {
     return {
       ok: true,
       data: files,
-      message: files.length ? `Found ${files.length} match${files.length > 1 ? "es" : ""} in the Stark Archive.` : `Nothing in the archive matches "${query}", sir.`,
+      message: files.length
+        ? `Found ${files.length} match${files.length > 1 ? "es" : ""} in the Stark Archive. Top hit: "${files[0].name}" (${files[0].typeLabel}) in ${files[0].folderPath}.`
+        : `Nothing in the archive matches "${query}", sir.`,
       preview: { tab: "drive", mode: "search", query },
     };
   },
   "drive.list_folder": async ({ folderId }) => {
-    const files = await drive.listFolder(folderId);
-    return { ok: true, data: files, message: `${files.length} items in that folder.`, preview: { tab: "drive", highlightId: folderId } };
+    const { folder, items } = await drive.listFolder(folderId);
+    return { ok: true, data: items, message: `${folder.path} holds ${items.length} item${items.length === 1 ? "" : "s"}, sir.`, preview: { tab: "drive", folderId: folder.id } };
   },
   "drive.create_folder": async ({ name, parentId }) => {
     const f = await drive.createFolder(name, parentId);
-    return { ok: true, data: f, message: `Folder "${f.name}" created, sir.`, preview: { tab: "drive", highlightId: f.id } };
+    return { ok: true, data: f, message: `Folder "${f.name}" created at ${f.folderPath}, sir.`, preview: { tab: "drive", highlightId: f.id, folderId: f.parentId } };
   },
 
   "telegram.send": async ({ recipient, text }, { commandId }) => {

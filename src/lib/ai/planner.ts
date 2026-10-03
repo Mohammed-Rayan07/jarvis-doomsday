@@ -52,7 +52,8 @@ export async function plan(req: PlanRequest, ctx: PlannerContext): Promise<Plan>
         temperature: 0,
         maxRetries: 0, // we fail over to the next model instead of waiting on retries
         // Planning is a fast structured task — keep Gemini "thinking" minimal for latency.
-        providerOptions: { google: { thinkingConfig: { thinkingLevel: "minimal" } } },
+        // (Flash-Lite accepts "minimal"; full Flash models only go down to "low".)
+        providerOptions: { google: { thinkingConfig: { thinkingLevel: id.includes("lite") ? "minimal" : "low" } } },
         abortSignal: AbortSignal.timeout(Math.min(PER_MODEL_TIMEOUT_MS, remaining)),
       });
       console.info(`[planner] ${id} ok in ${Date.now() - started}ms`);

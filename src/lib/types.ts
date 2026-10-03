@@ -100,6 +100,8 @@ export interface PreviewFocus {
   highlightId?: string;
   mode?: "browse" | "search";
   query?: string;
+  /** drive: folder to open in the explorer */
+  folderId?: string;
 }
 
 export type ErrorCode =
