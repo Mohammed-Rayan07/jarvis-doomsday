@@ -56,7 +56,7 @@ export async function plan(req: PlanRequest, ctx: PlannerContext): Promise<Plan>
         abortSignal: AbortSignal.timeout(Math.min(PER_MODEL_TIMEOUT_MS, remaining)),
       });
       console.info(`[planner] ${id} ok in ${Date.now() - started}ms`);
-      return { ...(output as Plan), source: "llm" };
+      return rollForwardPastTimes({ ...(output as Plan), source: "llm" }, req.now);
     } catch (err) {
       markUnhealthy(id);
       console.warn(`[planner] ${id} failed after ${Date.now() - started}ms:`, err instanceof Error ? err.message : err);
@@ -64,4 +64,30 @@ export async function plan(req: PlanRequest, ctx: PlannerContext): Promise<Plan>
   }
   console.error("[planner] all models failed, using backup brain");
   return { ...fallbackPlan(req), source: "backup" };
+}
+
+/**
+ * Models sometimes resolve a bare "at 7 PM" to today even after 7 PM has passed.
+ * Push new reminders/events that landed in the (same-day) past to the next day.
+ */
+const TIME_ARGS: Record<string, string[]> = {
+  "reminders.create": ["dueAt"],
+  "calendar.create_event": ["start", "end"],
+};
+
+export function rollForwardPastTimes(plan: Plan, nowIso: string): Plan {
+  const now = Date.parse(nowIso) || Date.now();
+  for (const step of plan.steps) {
+    const keys = TIME_ARGS[step.tool];
+    const primary = keys && step.args[keys[0]];
+    if (typeof primary !== "string") continue;
+    const t = Date.parse(primary);
+    if (Number.isNaN(t) || t >= now - 60_000 || now - t > 86_400_000) continue;
+    for (const k of keys) {
+      const v = step.args[k];
+      if (typeof v === "string" && !Number.isNaN(Date.parse(v))) step.args[k] = new Date(Date.parse(v) + 86_400_000).toISOString();
+    }
+    step.summary += " (tomorrow — that time has passed today)";
+  }
+  return plan;
 }

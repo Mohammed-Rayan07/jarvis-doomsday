@@ -423,7 +423,12 @@ Viewports: 1440×900, 1024×768, 390×844.
 
 ---
 
-## 13. Skeleton status (commit `b8a1f54`) & known TODOs
+## 13. Progress log & known TODOs
+
+**Done (verified in browser):** P1 core loop on Gemini (fallback chain + minimal thinking, 1–3 s plans) · P2 Google OAuth round-trip + Calendar create/list/update/delete + Calendar preview (7-day agenda, NOW marker, reminders overlaid in gold, highlight) · P3 Reminders view (overdue/today/upcoming/done, done/snooze/delete) + watcher (toast, notification, voice, Telegram ping to owner) · P5 (code) Telegram contacts sync/resolve/send + Comms view (history table + contact grid, invite link, owner star) — awaiting real contacts.
+**Planner guard:** same-day past times roll forward to tomorrow (models ignore the prompt rule).
+
+### Original skeleton status (commit `b8a1f54`)
 
 **Working now:** build + lint clean · HUD shell (status bar, arc reactor, split panes, mobile toggle) · chat + suggestion chips · `/api/plan` with LLM planner (needs key) and backup brain · client executor (queue / interrupt / Ctrl+Enter / STOP / clarify loop / confirm card / templating / per-step status / preview focus / action log) · reminders store + tools (end-to-end) · LOG tab · `/api/status` · Google OAuth routes + encrypted session · JSON storage · error envelopes.
 
@@ -433,7 +438,7 @@ Viewports: 1440×900, 1024×768, 390×844.
 - `fallback.ts`: chrono parses in server TZ → pass `{ instant: now, timezone: offsetMinutes(tz) }`; strip trailing punctuation/whitespace from reminder text ("check the reactor ." bug).
 - `/api/plan`: inject next-14-days events once P2 lands.
 - ConfirmCard: typed editors + Enter/Esc keys (P6).
-- `telegram.send` should report `NOT_CONFIGURED` before `NOT_IMPLEMENTED`.
+- Telegram AMBIGUOUS / NOT_FOUND recipient → render error `details.options` as clickable chips that re-send only that step (don't re-plan whole command: would duplicate earlier steps).
 - **P2 first thing:** verify OAuth cookies survive `Response.redirect` in `/api/auth/google` + callback (symptom: `auth_error=state_mismatch` or `connected:false`). Fix = `NextResponse.redirect()` + `res.cookies.set()`.
 - **First real-key run:** watch server logs for `[planner] LLM failed`; chat shows `[llm]`/`[backup]` per reply. If the provider rejects the open `args` record, switch `args` to a JSON string parsed in `/api/execute`. Add the promised one-shot repair retry.
 - **Deploy early (after P2), not at P8:** add prod redirect URI in Google Cloud; JSON store falls back to `/tmp` on Vercel (ephemeral) until the Redis adapter lands.
