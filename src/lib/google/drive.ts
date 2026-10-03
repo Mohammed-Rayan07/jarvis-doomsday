@@ -160,7 +160,10 @@ export async function listFolder(folderId = "root"): Promise<{ folder: DriveFile
   return { folder: { ...toFile(meta.data), name: id === rootId ? "My Drive" : (meta.data.name ?? "?"), path }, items: (res.data.files ?? []).map((f) => toFile(f)) };
 }
 
+let allFolders: { at: number; list: DriveFile[] } | undefined;
+
 export async function listAllFolders(): Promise<DriveFile[]> {
+  if (allFolders && Date.now() - allFolders.at < 120_000) return allFolders.list; // upload-card picker
   const d = await api();
   const root = await getRootId(d);
   const res = await call(
@@ -181,7 +184,9 @@ export async function listAllFolders(): Promise<DriveFile[]> {
     const p = byId.get(parent);
     return p ? `${path(p, depth + 1)} / ${f.name}` : `… / ${f.name}`;
   };
-  return files.map((f) => toFile(f, path(f))).sort((a, b) => (a.folderPath ?? "").localeCompare(b.folderPath ?? ""));
+  const list = files.map((f) => toFile(f, path(f))).sort((a, b) => (a.folderPath ?? "").localeCompare(b.folderPath ?? ""));
+  allFolders = { at: Date.now(), list };
+  return list;
 }
 
 export async function createFolder(name: string, parentId = "root"): Promise<DriveFile> {
@@ -252,6 +257,7 @@ const searchCache = new Map<string, { at: number; files: DriveFile[] }>();
 /** Uploads / new folders change what a search should return. */
 export function invalidateDriveCaches() {
   searchCache.clear();
+  allFolders = undefined;
   folderIndexAt = 0;
 }
 

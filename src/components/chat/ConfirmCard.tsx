@@ -83,7 +83,13 @@ export function ConfirmCard({ commandId, step, remaining = 0 }: { commandId: str
         {Object.entries(args).map(([k, v]) => (
           <label key={k} className="flex items-start gap-2 text-xs">
             <span className="w-24 shrink-0 pt-1.5 text-muted">{LABELS[k] ?? k}</span>
-            {isIso(v) ? (
+            {(k === "eventId" || k === "id") && typeof v === "string" ? (
+              // ids aren't for humans: show what the step targets, read-only
+              <span className="pt-1.5 text-text">
+                {step.summary.replace(/^(delete|remove|update|move|complete|snooze)\s+/i, "")}
+                <span className="ml-2 font-mono text-[0.6rem] text-muted">#{v.slice(0, 8)}</span>
+              </span>
+            ) : isIso(v) ? (
               <input
                 type="datetime-local"
                 value={toLocalInput(v)}

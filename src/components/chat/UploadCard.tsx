@@ -4,6 +4,7 @@ import { CheckCircle2, FileUp, FolderPlus, Loader2, RotateCcw, UploadCloud, X } 
 import { getAttachments, resolveInteraction } from "@/engine/executor";
 import type { DriveFile, JarvisErrorShape, StepRun, ToolResult } from "@/lib/types";
 import { cn } from "@/lib/cn";
+import { usePreview } from "@/store/preview";
 
 // Interactive Drive upload (BUILD_SPEC 3.1, §8.3):
 //   file (attached / picked / dropped) → destination (existing folder | new folder | My Drive)
@@ -33,6 +34,11 @@ export function UploadCard({ commandId, step }: { commandId: string; step: StepR
   const [dragging, setDragging] = useState(false);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const picker = useRef<HTMLInputElement>(null);
+
+  // Show the live Drive explorer beside the card while Tony picks a destination (3.1).
+  useEffect(() => {
+    if (usePreview.getState().tab !== "drive") usePreview.getState().focus({ tab: "drive" });
+  }, []);
 
   // Load folders for the picker and pre-select from the command ("…to my Reactor folder").
   useEffect(() => {

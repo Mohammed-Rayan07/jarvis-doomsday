@@ -57,7 +57,7 @@ export async function plan(req: PlanRequest, ctx: PlannerContext): Promise<Plan>
         abortSignal: AbortSignal.timeout(Math.min(PER_MODEL_TIMEOUT_MS, remaining)),
       });
       console.info(`[planner] ${id} ok in ${Date.now() - started}ms`);
-      return rollForwardPastTimes({ ...(output as Plan), source: "llm" }, req.now);
+      return guardAmbiguousTargets(enforceUpload(rollForwardPastTimes({ ...(output as Plan), source: "llm" }, req.now), req.text), req.text, ctx);
     } catch (err) {
       markUnhealthy(id);
       console.warn(`[planner] ${id} failed after ${Date.now() - started}ms:`, err instanceof Error ? err.message : err);
@@ -65,6 +65,43 @@ export async function plan(req: PlanRequest, ctx: PlannerContext): Promise<Plan>
   }
   console.error("[planner] all models failed, using backup brain");
   return { ...fallbackPlan(req), source: "backup" };
+}
+
+/**
+ * "Delete the meeting tomorrow" with three meetings tomorrow came back as three deletes.
+ * A singular reference that fans out into several changes to existing items must be a question.
+ */
+const TARGETED = new Set(["calendar.delete_event", "calendar.update_event", "reminders.delete", "reminders.complete", "reminders.snooze"]);
+
+export function guardAmbiguousTargets(plan: Plan, text: string, ctx: PlannerContext): Plan {
+  if (plan.kind !== "execute") return plan;
+  const targeted = plan.steps.filter((s) => TARGETED.has(s.tool));
+  const sameTool = targeted.filter((s) => s.tool === targeted[0]?.tool);
+  if (sameTool.length < 2 || /\b(all|every|both|each|everything|them|meetings|events|reminders)\b/i.test(text)) return plan;
+  const name = (s: (typeof sameTool)[number]) => {
+    const id = String(s.args.eventId ?? s.args.id ?? "");
+    return ctx.events.find((e) => e.id === id)?.title ?? ctx.reminders.find((r) => r.id === id)?.text ?? s.summary;
+  };
+  const options = sameTool.map(name).slice(0, 4);
+  const question = sameTool[0].tool.startsWith("calendar.") ? "Which one, sir?" : "Which reminder, sir?";
+  return { kind: "clarify", reply: `${question} ${options.join(", ")}?`, steps: [], clarification: { question, missing: ["target"], options }, source: plan.source };
+}
+
+/**
+ * "Upload this to my X folder" with chat history mentioning X sometimes comes back as a
+ * drive.search for the folder. An explicit "upload" always means the upload panel.
+ */
+export function enforceUpload(plan: Plan, text: string): Plan {
+  if (plan.kind !== "execute" || !/\bupload\b/i.test(text) || plan.steps.some((s) => s.tool === "drive.upload")) return plan;
+  const lookup = plan.steps.find((s) => s.tool === "drive.search" || s.tool === "drive.list_folder");
+  if (!lookup) return plan;
+  const folderName = text.match(/\b(?:to|into|in)\s+(?:my\s+|the\s+|a\s+new\s+folder\s+(?:called|named)\s+)?["']?([\w .-]+?)["']?\s+folder\b/i)?.[1]
+    ?? text.match(/folder\s+(?:called|named)\s+["']?([\w .-]+)/i)?.[1];
+  const createFolder = /\bnew folder\b/i.test(text);
+  const steps = plan.steps.map((s) =>
+    s === lookup ? { id: s.id, tool: "drive.upload" as const, args: { ...(folderName ? { folderName: folderName.trim() } : {}), ...(createFolder ? { createFolder } : {}) }, summary: `Upload the file${folderName ? ` to ${folderName.trim()}` : ""}` } : s,
+  );
+  return { ...plan, steps };
 }
 
 /**
