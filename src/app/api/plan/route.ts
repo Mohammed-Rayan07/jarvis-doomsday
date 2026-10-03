@@ -1,4 +1,5 @@
 import { plan } from "@/lib/ai/planner";
+import { fallbackPlan } from "@/lib/ai/fallback";
 import { ok, route } from "@/lib/http";
 import { listReminders } from "@/lib/reminders/service";
 import { listEvents } from "@/lib/google/calendar";
@@ -11,6 +12,10 @@ export const dynamic = "force-dynamic";
 export const POST = route(async (req: Request) => {
   const body = (await req.json()) as PlanRequest;
   const tz = body.tz || "Asia/Kolkata";
+  // Dev-only: exercise the rule-based backup brain without unsetting the AI key.
+  if (process.env.NODE_ENV !== "production" && req.headers.get("x-jarvis-brain") === "backup") {
+    return ok({ ...fallbackPlan({ ...body, tz }), source: "backup" });
+  }
 
   // Context so the planner can resolve names and ids (BUILD_SPEC §4 "Resolution").
   const now = Date.now();

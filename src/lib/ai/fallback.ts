@@ -31,16 +31,30 @@ function tzOffset(tz: string, at: Date) {
 
 const tidy = (s: string) => s.replace(/\s+([.,!?])/g, "$1").replace(/[\s.,!?]+$/, "").replace(/\s{2,}/g, " ").trim();
 
-function stepFor(clause: string, id: string, now: Date, tz: string): PlanStep | Plan {
+const fmt = (iso: string, tz: string) =>
+  new Intl.DateTimeFormat("en-IN", { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+
+/** `prevEvent` = the event created earlier in the same command, so "before it" / "about it" resolve. */
+function stepFor(clause: string, id: string, now: Date, tz: string, prevEvent?: PlanStep): PlanStep | PlanStep[] | Plan {
   const c = clause.trim();
   const t = when(c, now, tz);
+  const eventTitle = prevEvent ? String(prevEvent.args.title) : undefined;
+  const eventStart = prevEvent ? String(prevEvent.args.start) : undefined;
 
   if (/\bremind\b/i.test(c)) {
+    const rel = c.match(/(\d+)\s*(minutes?|mins?|hours?|hrs?)\s+before\s+(it|that|the meeting|the event)/i);
+    if (rel && eventStart) {
+      const ms = Number(rel[1]) * (/^h/i.test(rel[2]) ? 3_600_000 : 60_000);
+      const dueAt = new Date(Date.parse(eventStart) - ms).toISOString();
+      const text = `${eventTitle} in ${rel[1]} ${rel[2]}`;
+      return { id, tool: "reminders.create", args: { text, dueAt }, summary: `Reminder: ${text}` };
+    }
     if (!t) return clarify("When should I remind you, sir?", ["time"], ["In 1 hour", "Tonight 8 PM", "Tomorrow morning"]);
     const text = tidy(
       c
         .replace(/^(jarvis,?\s*)?remind me (to |about )?/i, "")
-        .replace(t.text, ""),
+        .replace(t.text, "")
+        .replace(/^\s*(to|about)\s+/i, ""),
     );
     return { id, tool: "reminders.create", args: { text: text || c, dueAt: t.date.toISOString() }, summary: `Reminder: ${text || c}` };
   }
@@ -54,18 +68,24 @@ function stepFor(clause: string, id: string, now: Date, tz: string): PlanStep | 
   if (/\b(send|message|tell|telegram)\b/i.test(c)) {
     const m = c.match(/(?:send|message|tell)\s+(?:a message to\s+)?(?:the\s+)?(\w+)(?:\s+a (?:telegram )?message)?(?:\s+(?:saying|that|:)\s+(.+))?/i);
     const recipient = m?.[1];
-    const text = m?.[2]?.replace(/[.]$/, "");
+    let text = m?.[2]?.replace(/[.]$/, "");
+    if (!text && eventTitle && /\babout (it|that|the meeting|the event)\b/i.test(c))
+      text = `Heads up: "${eventTitle}" is scheduled for ${fmt(eventStart!, tz)}. Be there.`;
     if (!recipient) return clarify("Who should I send it to, sir?", ["recipient"]);
-    if (!text) return clarify(`What should I tell ${recipient}, sir?`, ["message"]);
+    if (!text) return clarify(`What should I tell ${recipient.toLowerCase() === "team" ? "the team" : recipient}, sir?`, ["message"]);
     return { id, tool: "telegram.send", args: { recipient, text }, summary: `Telegram ${recipient}: "${text}"` };
   }
   if (/\b(what|show|list)\b.*\b(scheduled|calendar|schedule|have)\b/i.test(c)) {
-    const from = t?.date ?? now;
-    const start = new Date(from);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    return { id, tool: "calendar.list_events", args: { from: start.toISOString(), to: end.toISOString() }, summary: "Check schedule" };
+    // whole day in Tony's timezone
+    const z = toZonedTime(t?.date ?? now, tz);
+    z.setHours(0, 0, 0, 0);
+    const start = fromZonedTime(z, tz);
+    const end = new Date(start.getTime() + 86_400_000);
+    const tomorrow = /tomorrow/i.test(c);
+    return [
+      { id, tool: "calendar.list_events", args: { from: start.toISOString(), to: end.toISOString() }, summary: "Check calendar" },
+      { id: `${id}b`, tool: "reminders.list", args: { range: tomorrow ? "tomorrow" : "today" }, summary: "Check reminders" },
+    ];
   }
   if (/\b(schedule|meeting|event|book)\b/i.test(c)) {
     if (!t || !t.hasTime) return clarify("What time should I schedule it for, sir?", ["time"], ["Tomorrow 10 AM", "Tomorrow 4 PM", "Tomorrow 6 PM"]);
@@ -83,9 +103,10 @@ export function fallbackPlan(req: PlanRequest): Plan {
   const clauses = req.text.split(/,\s*(?:and\s+)?|\s+and then\s+|\s+then\s+|;\s*/i).filter(Boolean);
   const steps: PlanStep[] = [];
   for (const [i, clause] of clauses.entries()) {
-    const r = stepFor(clause, `s${i + 1}`, now, req.tz || "Asia/Kolkata");
-    if ("kind" in r) return r;
-    steps.push(r);
+    const prevEvent = [...steps].reverse().find((st) => st.tool === "calendar.create_event");
+    const r = stepFor(clause, `s${i + 1}`, now, req.tz || "Asia/Kolkata", prevEvent);
+    if (!Array.isArray(r) && "kind" in r) return r;
+    steps.push(...(Array.isArray(r) ? r : [r]));
   }
   return {
     kind: "execute",
