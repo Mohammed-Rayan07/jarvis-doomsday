@@ -31,7 +31,7 @@ export const errors = {
     new JarvisError(
       "NOT_CONFIGURED",
       `The ${label(integration)} link is offline, sir. Missing configuration: ${envVars.join(", ")}.`,
-      { integration, fix: { label: "Setup guide", href: "https://github.com/#setup" } },
+      { integration, fix: { label: "Setup guide", href: "https://github.com/Mohammed-Rayan07/jarvis-doomsday#credentials-all-optional" } },
     ),
   notConnected: (integration: Integration) =>
     new JarvisError("NOT_CONNECTED", `I'm not connected to ${label(integration)} yet, sir.`, {

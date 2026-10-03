@@ -190,6 +190,12 @@ async function logComms(entry: Omit<CommsEntry, "id" | "sentAt" | "channel" | "s
 
 export async function sendMessage(recipient: string, text: string, commandId?: string): Promise<CommsEntry> {
   if (!text.trim()) throw errors.missingField("message", `What should I tell ${recipient}, sir?`);
+  if (!telegramConfigured()) {
+    // integration unavailable ≠ unknown contact: say so plainly (and keep it in the comms history)
+    const err = errors.notConfigured("telegram", ["TELEGRAM_BOT_TOKEN"]);
+    await logComms({ recipientName: recipient, text, status: "failed", error: err.message, commandId });
+    throw err;
+  }
   let contact: Contact;
   try {
     contact = await resolveContact(recipient);

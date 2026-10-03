@@ -39,6 +39,8 @@ const clients = new Map<string, OAuth2Client>();
 
 /** Authenticated client for the current browser session, or throws NOT_CONFIGURED / NOT_CONNECTED. */
 export async function getGoogleClient() {
+  // no OAuth app configured → "integration unavailable", not "please connect" (connect can't work)
+  if (!googleConfigured()) throw errors.notConfigured("google", ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
   const session = await readGoogleSession();
   if (!session?.refresh_token && !session?.access_token) throw errors.notConnected("google");
   const key = session.refresh_token ?? session.access_token!;
