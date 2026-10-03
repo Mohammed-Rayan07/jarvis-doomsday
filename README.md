@@ -6,7 +6,7 @@
 
 ## 🎬 Demo video
 
-[![JARVIS × DOOMSDAY demo video](https://img.youtube.com/vi/tbvmZN2wMno/hqdefault.jpg)](https://youtu.be/tbvmZN2wMno)
+[![Watch the demo on YouTube](https://img.shields.io/badge/%E2%96%B6%20WATCH%20THE%20DEMO-YouTube%20%C2%B7%20~4%20min-ff0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/tbvmZN2wMno)
 
 **▶ https://youtu.be/tbvmZN2wMno**: every subtask running live against a real Google account and real Telegram users, in about 4 minutes.
 
