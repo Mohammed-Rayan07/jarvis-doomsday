@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Paperclip, Send, Square, X } from "lucide-react";
 import { useQueue, selectQueued } from "@/store/queue";
 import { interrupt, submit } from "@/engine/executor";
 import { StepTimeline } from "./StepTimeline";
 import { cn } from "@/lib/cn";
 import { useShallow } from "zustand/react/shallow";
+import { useDictation } from "@/hooks/useVoice";
 
 // COMMS LINK: transcript + step timelines + queue strip + command bar (BUILD_SPEC 1.1, 1.2, §5).
 
@@ -47,7 +48,7 @@ export function ChatPanel() {
         {messages.map((m) => {
           const cmd = m.role === "jarvis" && m.kind !== "summary" ? commands.find((c) => c.id === m.commandId) : undefined;
           return (
-            <div key={m.id} className={cn("max-w-[92%]", m.role === "user" ? "ml-auto text-right" : "")}>
+            <div key={m.id} className={cn("msg-in max-w-[92%]", m.role === "user" ? "ml-auto text-right" : "")}>
               <p className="hud-label mb-1 text-[0.55rem] text-muted">
                 {m.role === "user" ? "Tony" : "JARVIS"}
                 {m.source && <span className={cn("ml-2", m.source === "llm" ? "text-cyan" : "text-gold")}>[{m.source}]</span>}
@@ -117,6 +118,7 @@ function CommandInput() {
   const mode = useQueue((s) => s.mode);
   const setMode = useQueue((s) => s.setMode);
   const fileInput = useRef<HTMLInputElement>(null);
+  const dictation = useDictation(useCallback((spoken: string) => submit(spoken), []));
 
   const send = (interruptNow = false) => {
     submit(text, files, { interrupt: interruptNow });
@@ -139,7 +141,7 @@ function CommandInput() {
           <Paperclip className="size-4" />
         </button>
         <input
-          value={text}
+          value={dictation.listening ? dictation.interim || "Listening…" : text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -151,9 +153,16 @@ function CommandInput() {
           className="min-w-0 flex-1 rounded-sm border border-line bg-black/40 px-3 py-2 text-sm outline-none placeholder:text-muted/70 focus:border-primary"
           aria-label="Command input"
         />
-        <button aria-label="Voice input (coming in P7)" className="text-muted hover:text-cyan" disabled>
-          <Mic className="size-4" />
-        </button>
+        {dictation.supported && (
+          <button
+            onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+            aria-label={dictation.listening ? "Stop listening" : "Speak a command"}
+            title={dictation.listening ? "Listening… click to stop" : "Speak a command"}
+            className={cn("rounded-full p-1", dictation.listening ? "mic-live bg-red/20 text-red" : "text-muted hover:text-cyan")}
+          >
+            <Mic className="size-4" />
+          </button>
+        )}
         <button
           onClick={() => setMode(mode === "queue" ? "interrupt" : "queue")}
           title="QUEUE: new commands wait. INTERRUPT: new commands cancel the running one."

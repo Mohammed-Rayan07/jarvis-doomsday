@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { usePreview } from "@/store/preview";
 import type { Reminder } from "@/lib/types";
+import { speak } from "./useVoice";
 
 // "Don't let Tony forget" (BUILD_SPEC 2.2 bonus): poll for due reminders while the tab is open,
 // fire a toast + browser notification + spoken line, then mark them fired.
@@ -65,9 +66,7 @@ function fire(r: Reminder) {
       /* some browsers disallow constructor notifications */
     }
   }
-  if (typeof speechSynthesis !== "undefined" && localStorage.getItem("jarvis-voice") === "on") {
-    speechSynthesis.speak(new SpeechSynthesisUtterance(line));
-  }
+  speak(line);
   void fetch(`/api/reminders/${r.id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },

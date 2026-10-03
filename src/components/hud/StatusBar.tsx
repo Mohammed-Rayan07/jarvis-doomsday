@@ -4,6 +4,8 @@ import { ArcReactor, type ReactorState } from "./ArcReactor";
 import { useStatus } from "@/store/status";
 import { useQueue } from "@/store/queue";
 import { cn } from "@/lib/cn";
+import { Volume2, VolumeX } from "lucide-react";
+import { useVoiceToggle } from "@/hooks/useVoice";
 
 // Header: orb + JARVIS state + per-integration health chips + clock (BUILD_SPEC 1.1 / 5.3).
 
@@ -22,6 +24,7 @@ export function StatusBar() {
   const running = useQueue((s) => Boolean(s.currentId));
   const awaiting = useQueue((s) => Boolean(s.pending || s.awaitingInputFor));
   const [clock, setClock] = useState("");
+  const voice = useVoiceToggle();
 
   useEffect(() => {
     void refresh();
@@ -60,7 +63,17 @@ export function StatusBar() {
       {status?.google.connected && (
         <span className="hud-label hidden text-[0.55rem] text-muted xl:inline" title="Google account">{status.google.email}</span>
       )}
-      <span className="ml-auto font-mono text-xs text-muted md:ml-3">{clock}</span>
+      {voice.supported && (
+        <button
+          onClick={voice.toggle}
+          aria-label={voice.on ? "Mute JARVIS voice" : "Enable JARVIS voice"}
+          title={voice.on ? "Voice replies on" : "Voice replies off"}
+          className={cn("ml-auto rounded-sm border p-1.5 md:ml-2", voice.on ? "border-cyan/60 text-cyan" : "border-line text-muted hover:text-text")}
+        >
+          {voice.on ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+        </button>
+      )}
+      <span className="font-mono text-xs text-muted md:ml-1">{clock}</span>
     </header>
   );
 }
