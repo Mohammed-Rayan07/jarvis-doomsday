@@ -14,6 +14,7 @@ import { answerFor, confirmFor, doneFor, isRead, wrapUp } from "./speech";
 // Stock lines are separate utterances so the server's TTS cache makes them free after one take.
 
 const TERMINAL = new Set(["done", "partial", "failed"]);
+let lastStandDown = 0;
 
 /** A re-planned command (amended / clarified) reuses step ids — key narration by plan object. */
 const planSeq = new WeakMap<object, number>();
@@ -42,7 +43,9 @@ export function startNarration() {
         } else if (m.kind === "text") {
           if (m.planKind !== "execute") say(m.text);
         } else if (/^(Stood down|Operation cancelled|New orders received)/.test(m.text)) {
-          say("Standing down, sir.");
+          // an interrupt posts two of these back to back ("New orders…" + "Stood down…") — say it once
+          if (Date.now() - lastStandDown > 3000) say("Standing down, sir.");
+          lastStandDown = Date.now();
         } else if (m.kind === "error" && !/^\d+ of \d+ operations/.test(m.text)) {
           say(m.text); // planner / network failure (step failures are voiced by narrateOutcome)
         }
