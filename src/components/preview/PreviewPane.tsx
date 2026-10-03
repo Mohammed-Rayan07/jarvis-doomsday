@@ -4,6 +4,8 @@ import { Archive, Bell, CalendarDays, MessageSquare, ScrollText } from "lucide-r
 import { usePreview } from "@/store/preview";
 import type { ActionLogEntry, PreviewTab } from "@/lib/types";
 import { cn } from "@/lib/cn";
+import { CalendarView } from "./CalendarView";
+import { RemindersView } from "./RemindersView";
 
 // LIVE INTEGRATION PREVIEW PANE (BUILD_SPEC 1.1, §9). Each view is filled in its phase:
 // Calendar P2 · Reminders P3 · Archive P4 · Comms P5. LOG works now.
@@ -39,7 +41,15 @@ export function PreviewPane() {
         <span className="hud-label ml-auto hidden items-center px-3 text-[0.55rem] text-muted lg:flex">Live preview</span>
       </nav>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {tab === "log" ? <ActionLogView /> : <Placeholder tab={tab} />}
+        {tab === "calendar" ? (
+          <CalendarView />
+        ) : tab === "reminders" ? (
+          <RemindersView />
+        ) : tab === "log" ? (
+          <ActionLogView />
+        ) : (
+          <Placeholder tab={tab} />
+        )}
       </div>
     </section>
   );
