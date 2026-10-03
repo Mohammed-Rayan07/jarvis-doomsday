@@ -173,11 +173,14 @@ const enabled = () => get().output || get().live;
 export function say(text: string) {
   const clean = text.trim();
   if (!clean || typeof window === "undefined" || !enabled()) return;
-  stopListening(); // half-duplex: never transcribe ourselves
+  // half-duplex: never transcribe ourselves — but don't cut Tony off mid-sentence either;
+  // if he's talking, the queue waits and starts when his utterance ends (see listen → onend)
+  const tonyTalking = Boolean(rec && get().heard.trim());
+  if (!tonyTalking) stopListening();
   if (process.env.NODE_ENV !== "production") said.push(`${new Date().toISOString().slice(11, 19)} ${clean}`);
   queue.push({ text: clean });
   prefetch();
-  if (!pumping) void pump();
+  if (!pumping && !tonyTalking) void pump();
 }
 
 /** Shut up now (barge-in / mute). Live mode resumes listening. */
@@ -452,7 +455,8 @@ function listen() {
       hear(text);
     }
     set({ heard: "" });
-    if (get().live && !pumping) setTimeout(listen, text ? 120 : 60);
+    if (queue.length && !pumping) void pump(); // JARVIS waited for Tony to finish
+    else if (get().live && !pumping) setTimeout(listen, text ? 120 : 60);
   };
   rec = r;
   set({ listening: true });
@@ -500,6 +504,11 @@ export function hear(raw: string) {
         // JARVIS asked "shall I go ahead with all of it?" → a plain "yes" authorises the lot
         const all = ALL.test(norm) || allOffered.has(q.pending.commandId);
         return resolveInteraction(key, { type: "approve", args: getDraftArgs(key), all });
+      }
+      // not a yes/no: Tony is still finishing the order he started — fold it in and re-plan
+      if (Date.now() - lastOrderAt < 10_000 && amendPlanning(text)) {
+        lastOrderAt = Date.now();
+        return;
       }
       say("Say confirm, or cancel, sir.");
       return;

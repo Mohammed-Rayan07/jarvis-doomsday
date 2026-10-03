@@ -41,6 +41,8 @@ Press **LIVE** (Chrome / Edge) and just talk: *"Jarvis, what's on my schedule to
 - **Hands-free authorisation.** When a confirmation card is up, say **"confirm"**, **"authorise all"**, **"skip"** or **"cancel"**. Say **"stop"** to abort a running operation, and **"that's all"** to close the link.
 - **Half-duplex by design.** The mic pauses while JARVIS talks, so it never transcribes itself. Press **Space** or tap the core to interrupt it.
 - **The visuals react to the audio.** A canvas orb draws the live frequency spectrum (green while JARVIS speaks, cyan while you do). There's a live transcript and a typewriter caption, and the header reactor pulses with the voice.
+- **Talks like a person, not a log.** Lookups get one composed answer ("Tomorrow you have two things: the gamma reactor review at 4 PM and the Stark team meeting at 6 PM."). Multi-step plans ask once: "…shall I go ahead with all of it?" If you pause mid-order, the pieces merge into one command.
+- **About 2 s from your last word to JARVIS's voice.** Keep-alive connections to Gemini and ElevenLabs, a warm-up the moment you start talking, a cached calendar context, and no "fetching…" preambles.
 - **Budget-safe.** Repeated lines are served from a disk cache for free, a character budget caps spend, and anything that goes wrong (no key, quota, rate limit) falls back to the browser's voice automatically.
 
 ## How it works
@@ -75,8 +77,12 @@ npm run dev                  # http://localhost:3000
 | **AI (Gemini, free)** | Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Set `AI_PROVIDER=google` and `GOOGLE_GENERATIVE_AI_API_KEY=…` (Anthropic / OpenAI are also supported). |
 | **Google Calendar + Drive** | In Google Cloud: create a project, enable the **Calendar API** and **Drive API**, and set the OAuth consent screen to External / Testing with yourself as a **test user**. Create an OAuth client (Web) with redirect `http://localhost:3000/api/auth/google/callback`. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then click **Connect Google** in the header. |
 | **Telegram** | Get a token from @BotFather (`/newbot`) and set it as `TELEGRAM_BOT_TOKEN`. Everyone JARVIS should message must press **Start** on the bot. Open the **Comms** tab and hit **Sync**, then ⭐ your own chat for reminder pings. Add the bot to a group whose name contains "team" to enable "message the team". |
-| **Voice (optional)** | Create an [ElevenLabs](https://elevenlabs.io) API key with *Text to Speech* permission and set `ELEVENLABS_API_KEY`. The default voice is the premade "Daniel"; on paid plans `ELEVENLABS_VOICE_ID` can pick any voice. Without a key, JARVIS uses the browser's built-in voice. |
+| **Voice (optional)** | Create an [ElevenLabs](https://elevenlabs.io) API key with *Text to Speech* permission and set `ELEVENLABS_API_KEY`. The default voice is the premade "George"; on paid plans `ELEVENLABS_VOICE_ID` can pick any voice. Without a key, JARVIS uses the browser's built-in voice. |
 | **Session** | Set `SESSION_SECRET` to 32+ random chars: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+
+### Recording a demo
+
+`npm run demo:reset` clears reminders, the comms log and the action log. It keeps Telegram contacts, settings and cached voice lines. Calendar events and Drive files are left alone.
 
 ### Try these
 

@@ -83,6 +83,13 @@ export function guardAmbiguousTargets(plan: Plan, text: string, ctx: PlannerCont
     return ctx.events.find((e) => e.id === id)?.title ?? ctx.reminders.find((r) => r.id === id)?.text ?? s.summary;
   };
   const options = sameTool.map(name).slice(0, 4);
+  // "delete the reactor meeting and the audit sync" names both on purpose — not ambiguous
+  const said = text.toLowerCase();
+  const mentioned = options.filter((o) => {
+    const words = o.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+    return said.includes(o.toLowerCase()) || (words.length > 0 && words.filter((w) => said.includes(w)).length >= Math.min(2, words.length));
+  });
+  if (mentioned.length >= 2) return plan;
   const question = sameTool[0].tool.startsWith("calendar.") ? "Which one, sir?" : "Which reminder, sir?";
   return { kind: "clarify", reply: `${question} ${options.join(", ")}?`, steps: [], clarification: { question, missing: ["target"], options }, source: plan.source };
 }

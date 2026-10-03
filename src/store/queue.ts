@@ -49,6 +49,7 @@ interface QueueState {
   setPending: (p?: PendingInteraction) => void;
   setAwaitingInput: (id?: string) => void;
   editMessage: (id: string, text: string) => void;
+  dropMessage: (id: string) => void;
 }
 
 export const useQueue = create<QueueState>((set) => ({
@@ -76,6 +77,7 @@ export const useQueue = create<QueueState>((set) => ({
   setPending: (pending) => set({ pending }),
   setAwaitingInput: (awaitingInputFor) => set({ awaitingInputFor }),
   editMessage: (id, text) => set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, text } : m)) })),
+  dropMessage: (id) => set((s) => ({ messages: s.messages.filter((m) => m.id !== id) })),
 }));
 
 export const selectQueued = (s: QueueState) => s.commands.filter((c) => c.status === "queued");

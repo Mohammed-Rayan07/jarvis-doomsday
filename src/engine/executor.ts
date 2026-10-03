@@ -90,14 +90,16 @@ export function submit(text: string, files: File[] = [], opts: { interrupt?: boo
 }
 
 /**
- * Voice: Tony paused mid-order ("Send a message." … "to the team, saying I'm late").
- * If the last command is still being planned, fold the new words into it and re-plan
- * instead of queueing a second, broken command. Returns false if there's nothing to amend.
+ * Voice: Tony paused mid-order ("Schedule the team meeting at 6 PM," … "remind me 30 minutes
+ * before it"). If the current command is still being planned — or already planned but nothing
+ * has run yet (e.g. its first confirmation card is up) — fold the new words into it and re-plan
+ * silently instead of queueing a second, broken command. Returns false if there's nothing to amend.
  */
 export function amendPlanning(extra: string): boolean {
   const q = useQueue.getState();
   const cmd = q.commands.find((c) => c.id === q.currentId);
-  if (!cmd || cmd.status !== "planning" || !controller) return false;
+  const untouched = cmd?.status === "planning" || (cmd?.status === "running" && !cmd.steps.some((s) => s.status === "done" || s.status === "running"));
+  if (!cmd || !untouched || !controller) return false;
   const text = `${cmd.text} ${extra}`.trim();
   q.updateCommand(cmd.id, { text });
   const msg = [...q.messages].reverse().find((m) => m.role === "user" && m.commandId === cmd.id);
@@ -197,6 +199,15 @@ async function run(commandId: string, clarificationAnswer?: string) {
 
     commandResults.set(commandId, {});
     await executeSteps(commandId, 0, signal);
+    if (replanId === commandId) {
+      // amended while its first step awaited confirmation → re-plan with the merged words
+      replanId = undefined;
+      approveAll.delete(commandId);
+      q.updateCommand(commandId, { status: "planning", steps: [], plan: undefined, finishedAt: undefined });
+      const stale = [...useQueue.getState().messages].reverse().find((m) => m.role === "jarvis" && m.commandId === commandId && m.kind === "text");
+      if (stale) q.dropMessage(stale.id); // superseded reply
+      return void run(commandId, clarificationAnswer);
+    }
   } catch (err) {
     if (replanId === commandId) {
       replanId = undefined;
@@ -241,6 +252,7 @@ async function executeSteps(commandId: string, startIndex: number, signal: Abort
   const done = final.steps.filter((s) => s.status === "done").length;
   const status = signal.aborted ? "cancelled" : done === final.steps.length ? "done" : done > 0 ? "partial" : "failed";
   q.updateCommand(commandId, { status, finishedAt: nowIso() });
+  if (replanId === commandId) return; // being re-planned (amended) — not a real stand-down
   if (final.steps.length > 1 || status !== "done") {
     const failedStep = final.steps.find((s) => s.status === "failed");
     q.pushMessage({

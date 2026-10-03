@@ -430,7 +430,7 @@ P4 Drive (verified with real account): explorer with breadcrumbs/back, search (a
 **Gemini thinking:** Flash-Lite accepts `minimal`, Flash models only `low` — set per model (planning 1.5–2.7 s).
 **Planner guard:** same-day past times roll forward to tomorrow (models ignore the prompt rule).
 P6 Task 5 (verified): multi-step + Authorise all, queue/interrupt, clarify → contact/time options, typed error cards, backup brain covers every canonical command.
-**P9 Voice link (5.3 stretch, verified):** `POST /api/voice/tts` streams ElevenLabs (`eleven_flash_v2_5`, premade "Daniel"; library voices are paid-only → auto-fallback to the premade voice). There's a disk cache at `.data/tts/` (repeat lines are free, ~7 ms) and a char budget in `_meta` (`voice.charsUsed`, cap `ELEVENLABS_CHAR_BUDGET`). Quota, rate-limit or missing key → browser speechSynthesis.
+**P9 Voice link (5.3 stretch, verified):** `POST /api/voice/tts` streams ElevenLabs (`eleven_flash_v2_5`, premade voice; library voices are paid-only → auto-fallback to the premade voice). There's a disk cache at `.data/tts/` (repeat lines are free, ~7 ms) and a char budget in `_meta` (`voice.charsUsed`, cap `ELEVENLABS_CHAR_BUDGET`). Quota, rate-limit or missing key → browser speechSynthesis.
 - Client `src/engine/voice.ts` holds:
   - a serial speech queue that prefetches one line ahead
   - MediaSource streaming through an AnalyserNode

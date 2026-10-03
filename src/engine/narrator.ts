@@ -15,6 +15,15 @@ import { answerFor, confirmFor, doneFor, isRead, wrapUp } from "./speech";
 
 const TERMINAL = new Set(["done", "partial", "failed"]);
 
+/** A re-planned command (amended / clarified) reuses step ids — key narration by plan object. */
+const planSeq = new WeakMap<object, number>();
+let seq = 0;
+const planKey = (c: Command) => {
+  if (!c.plan) return 0;
+  if (!planSeq.has(c.plan)) planSeq.set(c.plan, ++seq);
+  return planSeq.get(c.plan)!;
+};
+
 export function startNarration() {
   const spokenMsgs = new Set(useQueue.getState().messages.map((m) => m.id));
   const spokenSteps = new Set<string>();
@@ -53,14 +62,15 @@ export function startNarration() {
 }
 
 function narrateStep(c: Command, st: StepRun, spoken: Set<string>, asked: Set<string>) {
-  const key = `${c.id}:${st.id}:${st.status}:${st.startedAt ?? ""}`;
+  const key = `${c.id}:${planKey(c)}:${st.id}:${st.status}:${st.startedAt ?? ""}`;
   if (spoken.has(key)) return;
   spoken.add(key);
   if (st.status === "awaiting_confirmation") {
-    if (asked.has(c.id)) return; // "all of it" was already asked for this command
+    const askKey = `${c.id}:${planKey(c)}`;
+    if (asked.has(askKey)) return; // "all of it" was already asked for this plan
     const { text, all } = confirmFor(c, st);
     if (all) {
-      asked.add(c.id);
+      asked.add(askKey);
       offerAll(c.id);
     }
     say(text);
