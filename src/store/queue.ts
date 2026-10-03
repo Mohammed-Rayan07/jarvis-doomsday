@@ -17,6 +17,8 @@ export interface ChatMessage {
   options?: string[];
   /** which brain produced the plan — surfaced so a silent LLM fallback is visible */
   source?: "llm" | "backup";
+  /** for plan replies: the plan kind, so voice can skip "fetching…" preambles on execute plans */
+  planKind?: "execute" | "clarify" | "answer";
 }
 
 /** Pending user decision the executor is awaiting (confirm card / upload card). */
@@ -46,6 +48,7 @@ interface QueueState {
   pushMessage: (m: ChatMessage) => void;
   setPending: (p?: PendingInteraction) => void;
   setAwaitingInput: (id?: string) => void;
+  editMessage: (id: string, text: string) => void;
 }
 
 export const useQueue = create<QueueState>((set) => ({
@@ -72,6 +75,7 @@ export const useQueue = create<QueueState>((set) => ({
   pushMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
   setPending: (pending) => set({ pending }),
   setAwaitingInput: (awaitingInputFor) => set({ awaitingInputFor }),
+  editMessage: (id, text) => set((s) => ({ messages: s.messages.map((m) => (m.id === id ? { ...m, text } : m)) })),
 }));
 
 export const selectQueued = (s: QueueState) => s.commands.filter((c) => c.status === "queued");

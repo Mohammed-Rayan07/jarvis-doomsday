@@ -30,7 +30,7 @@ const handlers: { [T in ToolName]: Handler<T> } = {
     };
   },
   "calendar.list_events": async (args, { tz }) => {
-    const events = await calendar.listEvents(args);
+    const events = await calendar.listEventsFast(args);
     return {
       ok: true,
       data: events,

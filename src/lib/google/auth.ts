@@ -31,17 +31,33 @@ export function consentUrl(state: string) {
   });
 }
 
+/**
+ * Clients are reused per refresh token: a fresh OAuth2Client per request re-ran the token refresh
+ * whenever the cookie's access token had expired (+1–3 s on every Calendar/Drive call).
+ */
+const clients = new Map<string, OAuth2Client>();
+
 /** Authenticated client for the current browser session, or throws NOT_CONFIGURED / NOT_CONNECTED. */
 export async function getGoogleClient() {
-  const client = oauthClient();
   const session = await readGoogleSession();
   if (!session?.refresh_token && !session?.access_token) throw errors.notConnected("google");
+  const key = session.refresh_token ?? session.access_token!;
+  const cached = clients.get(key);
+  if (cached) return cached;
+
+  const client = oauthClient();
   client.setCredentials(session);
-  // Persist refreshed tokens back into the cookie.
+  // Persist refreshed tokens back into the cookie (best effort: outside a request it can't be set,
+  // but this in-memory client already holds the new token).
   client.on("tokens", (tokens) => {
-    void writeGoogleSession({ ...session, ...tokens, refresh_token: tokens.refresh_token ?? session.refresh_token });
+    void writeGoogleSession({ ...session, ...tokens, refresh_token: tokens.refresh_token ?? session.refresh_token }).catch(() => undefined);
   });
+  clients.set(key, client);
   return client;
+}
+
+export function forgetGoogleClients() {
+  clients.clear();
 }
 
 /** Map googleapis errors to JarvisErrors. */
@@ -50,6 +66,7 @@ export function mapGoogleError(err: unknown): unknown {
   const status = e?.response?.status ?? e?.status ?? (typeof e?.code === "number" ? e.code : undefined);
   if (e?.message?.includes("invalid_grant") || status === 401) {
     // Revoked / expired refresh token: drop the dead cookie so the UI shows "Connect Google" again.
+    clients.clear();
     void clearGoogleSession().catch(() => undefined);
     return errors.authExpired("google");
   }

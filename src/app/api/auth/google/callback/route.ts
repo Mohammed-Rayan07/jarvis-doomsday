@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { oauthClient } from "@/lib/google/auth";
 import { OAUTH_STATE_COOKIE, writeGoogleSession } from "@/lib/session";
+import { clearEventCache } from "@/lib/google/calendar";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
       const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: env.googleClientId });
       email = ticket.getPayload()?.email;
     }
+    clearEventCache(); // new account → don't serve the previous one's events
     await writeGoogleSession({
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,

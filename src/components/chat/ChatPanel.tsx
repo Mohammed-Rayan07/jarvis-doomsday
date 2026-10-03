@@ -7,7 +7,7 @@ import { StepTimeline } from "./StepTimeline";
 import { cn } from "@/lib/cn";
 import { useShallow } from "zustand/react/shallow";
 import { useDictation, useLiveSupported } from "@/hooks/useVoice";
-import { hear, setLive, useVoice } from "@/engine/voice";
+import { hear, setLive, useVoice, warmUp } from "@/engine/voice";
 import { VoiceDock } from "@/components/voice/VoiceDock";
 
 // COMMS LINK: transcript + step timelines + queue strip + command bar (BUILD_SPEC 1.1, 1.2, §5).
@@ -27,6 +27,8 @@ export function ChatPanel() {
   const commands = useQueue((s) => s.commands);
   const scroller = useRef<HTMLDivElement>(null);
   const live = useVoice((s) => s.live);
+  const timelineAt = new Map<string, string>();
+  for (const m of messages) if (m.role === "jarvis" && m.commandId && (m.kind === "text" || m.kind === "clarify")) timelineAt.set(m.commandId, m.id);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -49,7 +51,8 @@ export function ChatPanel() {
           </div>
         )}
         {messages.map((m) => {
-          const cmd = m.role === "jarvis" && m.kind !== "summary" ? commands.find((c) => c.id === m.commandId) : undefined;
+          // a command's step timeline lives under its LATEST plan reply only (clarify rounds re-plan the same command)
+          const cmd = m.role === "jarvis" && m.kind !== "summary" && timelineAt.get(m.commandId ?? "") === m.id ? commands.find((c) => c.id === m.commandId) : undefined;
           return (
             <div key={m.id} className={cn("msg-in max-w-[92%]", m.role === "user" ? "ml-auto text-right" : "")}>
               <p className="hud-label mb-1 text-[0.55rem] text-muted">
@@ -149,7 +152,10 @@ function CommandInput() {
         </button>
         <input
           value={dictation.listening ? dictation.interim || "Listening…" : text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            warmUp(); // pre-open upstream connections + refresh calendar context while Tony types
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();

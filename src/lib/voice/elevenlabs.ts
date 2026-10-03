@@ -12,7 +12,7 @@ import { DATA_DIR } from "../storage/json";
 //  - character budget persisted in _meta: the free tier can't report its own quota (key lacks user_read)
 //  - library voices are paid-only; on `free_users_not_allowed` fall back to a premade British voice for good
 
-/** Premade voices are available on every tier. Daniel = deep British broadcaster; George = warm British. */
+/** Premade voices are available on every tier. Daniel = British newsreader; George = warm British storyteller. */
 const PREMADE = { daniel: "onwK4e9ZLuTAKqWW03F9", george: "JBFqnCBsd6RMkjVDRZzb" };
 const MAX_CHARS = 420;
 const CACHE_DIR = path.join(DATA_DIR, "tts");
@@ -20,7 +20,8 @@ const META_KEY = "voice.charsUsed";
 
 let voiceOverride: string | undefined;
 
-export const voiceId = () => voiceOverride ?? env.elevenVoice ?? PREMADE.daniel;
+// George: warm, unhurried British baritone — the closest premade voice to the films' JARVIS.
+export const voiceId = () => voiceOverride ?? env.elevenVoice ?? PREMADE.george;
 
 const MONTHS: Record<string, string> = { Jan: "January", Feb: "February", Mar: "March", Apr: "April", Jun: "June", Jul: "July", Aug: "August", Sep: "September", Sept: "September", Oct: "October", Nov: "November", Dec: "December" };
 const DAYS: Record<string, string> = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
@@ -72,9 +73,9 @@ export async function synthesize(text: string, signal?: AbortSignal): Promise<Re
   let res = await request(text, signal);
   if (res.status === 400 || res.status === 402) {
     const body = await res.text();
-    if (/free_users_not_allowed|paid_plan_required|creator tier/i.test(body) && voiceId() !== PREMADE.daniel) {
-      voiceOverride = PREMADE.daniel; // remembered: don't pay a failed round-trip on every line
-      console.warn("[voice] configured voice needs a paid ElevenLabs plan — using premade 'Daniel'");
+    if (/free_users_not_allowed|paid_plan_required|creator tier/i.test(body) && voiceId() !== PREMADE.george) {
+      voiceOverride = PREMADE.george; // remembered: don't pay a failed round-trip on every line
+      console.warn("[voice] configured voice needs a paid ElevenLabs plan — using premade 'George'");
       res = await request(text, signal);
     } else {
       throw upstream(res.status, body);
@@ -96,8 +97,8 @@ function request(text: string, signal?: AbortSignal) {
     body: JSON.stringify({
       text,
       model_id: env.elevenModel,
-      // Measured, dry, slightly brisk — butler, not narrator.
-      voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true, speed: 1.04 },
+      // Lower stability = more natural intonation (less "reading aloud"); slightly brisk like a real reply.
+      voice_settings: { stability: 0.38, similarity_boost: 0.8, style: 0, use_speaker_boost: true, speed: 1.07 },
     }),
     signal,
   });

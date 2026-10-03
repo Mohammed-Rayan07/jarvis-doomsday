@@ -455,6 +455,17 @@ P6 Task 5 (verified): multi-step + Authorise all, queue/interrupt, clarify → c
 - **First real-key run:** watch server logs for `[planner] LLM failed`; chat shows `[llm]`/`[backup]` per reply. If the provider rejects the open `args` record, switch `args` to a JSON string parsed in `/api/execute`. Add the promised one-shot repair retry.
 - **Deploy early (after P2), not at P8:** add prod redirect URI in Google Cloud; JSON store falls back to `/tmp` on Vercel (ephemeral) until the Redis adapter lands.
 
+**P9b Voice latency + naturalness pass (verified):** end of speech → JARVIS audio went from about 5.7 s to about 2.1–2.4 s.
+- `src/instrumentation-node.ts` sets a global undici keep-alive. Node dropped idle sockets after 4 s, so every turn paid the TLS handshake to Gemini and ElevenLabs.
+- `/api/voice/warm` fires on the first interim word or keystroke. It pre-opens the upstream connections and refreshes the planner's calendar context.
+- Planner calendar context is a stale-while-revalidate cache (`calendar.upcomingEvents`), patched by our own writes. `list_events` is served from it when fresh. That was 0.4–2.8 s per turn.
+- OAuth2 clients are reused per refresh token. A fresh client per request re-ran the token refresh each time.
+- Execute plans no longer speak a "fetching…" preamble. `engine/speech.ts` composes one natural line from the results: "Tomorrow you have two things: X at 4 PM and Y at 6 PM."
+- Confirmations ask once. A multi-step plan asks "…shall I go ahead with all of it?" and a spoken yes authorises all.
+- End of speech uses 0.55 s, or 1.7 s after a hanging word ("…and", "…saying", "um").
+- Mid-sentence fragments merge into the command still being planned (`amendPlanning`).
+- Prompt now asks for spoken-style replies and direct clarify questions, and "a test message" no longer triggers a clarify.
+- Default voice is George, with stability 0.38 and speed 1.07.
 - Demo tip: record LIVE mode with headphones, or speakers at low volume; Chrome or Edge only (Web Speech recognition).
 
 ## 14. Submission checklist

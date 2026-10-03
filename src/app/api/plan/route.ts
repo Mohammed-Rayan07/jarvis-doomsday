@@ -2,7 +2,7 @@ import { plan } from "@/lib/ai/planner";
 import { fallbackPlan } from "@/lib/ai/fallback";
 import { ok, route } from "@/lib/http";
 import { listReminders } from "@/lib/reminders/service";
-import { listEvents } from "@/lib/google/calendar";
+import { upcomingEvents } from "@/lib/google/calendar";
 import { COLLECTIONS, storage } from "@/lib/storage";
 import type { Contact, PlanRequest } from "@/lib/types";
 import type { PlannerContext } from "@/lib/ai/prompt";
@@ -22,8 +22,9 @@ export const POST = route(async (req: Request) => {
   const [contacts, reminders, events] = await Promise.all([
     storage().getAll<Contact>(COLLECTIONS.contacts).catch(() => []),
     listReminders("upcoming", tz).catch(() => []),
-    listEvents({ from: new Date(now - 86_400_000).toISOString(), to: new Date(now + 14 * 86_400_000).toISOString() }).catch(() => []),
+    upcomingEvents().catch(() => []), // cached (SWR) — the Calendar round-trip was the biggest latency chunk
   ]);
+  console.info(`[plan] context ${Date.now() - now}ms`);
   const ctx: PlannerContext = {
     now: body.now || new Date().toISOString(),
     tz,

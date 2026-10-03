@@ -20,6 +20,8 @@ let controller: AbortController | undefined;
 /** Interrupting command jumps the queue once the aborted one settles. */
 let priorityNext: string | undefined;
 let attachments: File[] = [];
+/** Command being re-planned because Tony kept talking (voice fragment merged into it). */
+let replanId: string | undefined;
 const waiters = new Map<string, (v: InteractionOutcome) => void>();
 /** Step results per command, so templates still resolve when a step is retried later. */
 const commandResults = new Map<string, Record<string, ToolResult>>();
@@ -87,6 +89,24 @@ export function submit(text: string, files: File[] = [], opts: { interrupt?: boo
   }
 }
 
+/**
+ * Voice: Tony paused mid-order ("Send a message." … "to the team, saying I'm late").
+ * If the last command is still being planned, fold the new words into it and re-plan
+ * instead of queueing a second, broken command. Returns false if there's nothing to amend.
+ */
+export function amendPlanning(extra: string): boolean {
+  const q = useQueue.getState();
+  const cmd = q.commands.find((c) => c.id === q.currentId);
+  if (!cmd || cmd.status !== "planning" || !controller) return false;
+  const text = `${cmd.text} ${extra}`.trim();
+  q.updateCommand(cmd.id, { text });
+  const msg = [...q.messages].reverse().find((m) => m.role === "user" && m.commandId === cmd.id);
+  if (msg) q.editMessage(msg.id, text);
+  replanId = cmd.id;
+  controller.abort();
+  return true;
+}
+
 export function interrupt(reason = "Operation cancelled, sir.") {
   if (!controller) return;
   controller.abort();
@@ -142,6 +162,7 @@ async function run(commandId: string, clarificationAnswer?: string) {
     const planJson = await planRes.json();
     if (!planJson.ok) throw new Error(planJson.error?.message ?? "Planner offline");
     const plan = planJson.data as Plan;
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError"); // amended / interrupted mid-flight
 
     q.pushMessage({
       id: nanoid(),
@@ -152,6 +173,7 @@ async function run(commandId: string, clarificationAnswer?: string) {
       kind: plan.kind === "clarify" ? "clarify" : "text",
       options: plan.clarification?.options,
       source: plan.source,
+      planKind: plan.steps.length ? plan.kind : plan.kind === "execute" ? "answer" : plan.kind,
     });
 
     if (plan.kind === "clarify") {
@@ -170,6 +192,10 @@ async function run(commandId: string, clarificationAnswer?: string) {
     commandResults.set(commandId, {});
     await executeSteps(commandId, 0, signal);
   } catch (err) {
+    if (replanId === commandId) {
+      replanId = undefined;
+      return void run(commandId, clarificationAnswer);
+    }
     const aborted = signal.aborted;
     q.updateCommand(commandId, { status: aborted ? "cancelled" : "failed", finishedAt: nowIso() });
     if (!aborted) {

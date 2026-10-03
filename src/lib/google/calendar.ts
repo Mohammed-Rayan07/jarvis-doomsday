@@ -3,6 +3,7 @@ import { calendar, type calendar_v3 } from "@googleapis/calendar";
 import type { CalendarEvent } from "../types";
 import type { ToolArgs } from "../tools/schemas";
 import { errors, JarvisError } from "../errors";
+import { after } from "next/server";
 import { getGoogleClient, mapGoogleError } from "./auth";
 
 // BUILD_SPEC §8.2
@@ -65,7 +66,9 @@ export async function createEvent(args: ToolArgs<"calendar.create_event">, tz: s
       }),
     "create the event",
   );
-  return toEvent(res.data);
+  const ev = toEvent(res.data);
+  patchCache((list) => [...list, ev].sort((a, b) => a.start.localeCompare(b.start)));
+  return ev;
 }
 
 export async function listEvents(args: ToolArgs<"calendar.list_events">): Promise<CalendarEvent[]> {
@@ -104,10 +107,62 @@ export async function updateEvent(args: ToolArgs<"calendar.update_event">, tz: s
     patch.end = { dateTime: new Date(args.end).toISOString(), timeZone: tz };
   }
   const res = await call(() => cal.events.patch({ calendarId: "primary", eventId: args.eventId, requestBody: patch }), "update the event");
-  return toEvent(res.data);
+  const ev = toEvent(res.data);
+  patchCache((list) => list.map((e) => (e.id === ev.id ? ev : e)));
+  return ev;
 }
 
 export async function deleteEvent(args: ToolArgs<"calendar.delete_event">): Promise<void> {
   const cal = await api();
   await call(() => cal.events.delete({ calendarId: "primary", eventId: args.eventId }), "delete the event");
+  patchCache((list) => list.filter((e) => e.id !== args.eventId));
+}
+
+/* ── Planner context cache ───────────────────────────────────────────────────
+ * Every plan needs "upcoming events" (to resolve "move the meeting", "before it", ids…), and the
+ * Calendar round-trip costs 0.4–2.8 s — the single biggest chunk of voice latency. Serve it
+ * stale-while-revalidate: our own writes patch the cache in place, and /api/voice/warm refreshes
+ * it the moment Tony starts talking. Single-user app → one cache (cleared on logout). */
+
+const FRESH_MS = 30_000;
+const MAX_AGE_MS = 10 * 60_000;
+let upcoming: { at: number; from: number; to: number; events: CalendarEvent[] } | undefined;
+
+function patchCache(fn: (list: CalendarEvent[]) => CalendarEvent[]) {
+  if (upcoming) upcoming = { ...upcoming, events: fn(upcoming.events) };
+}
+
+export function clearEventCache() {
+  upcoming = undefined;
+}
+
+export async function refreshUpcoming() {
+  const now = Date.now();
+  const from = now - 86_400_000;
+  const to = now + 14 * 86_400_000;
+  const events = await listEvents({ from: new Date(from).toISOString(), to: new Date(to).toISOString() });
+  upcoming = { at: Date.now(), from, to, events };
+  return events;
+}
+
+/**
+ * "What do I have tomorrow?" — answered from the warm cache when it covers the range and is fresh
+ * (refreshed by /api/voice/warm while Tony was speaking, patched by our own writes).
+ */
+export async function listEventsFast(args: ToolArgs<"calendar.list_events">): Promise<CalendarEvent[]> {
+  const from = Date.parse(args.from);
+  const to = Date.parse(args.to);
+  if (upcoming && !args.query && Date.now() - upcoming.at < 45_000 && from >= upcoming.from && to <= upcoming.to) {
+    return upcoming.events.filter((e) => Date.parse(e.end) > from && Date.parse(e.start) < to);
+  }
+  return listEvents(args);
+}
+
+export async function upcomingEvents(): Promise<CalendarEvent[]> {
+  const age = upcoming ? Date.now() - upcoming.at : Infinity;
+  if (upcoming && age < MAX_AGE_MS) {
+    if (age > FRESH_MS) after(() => refreshUpcoming().catch(() => undefined));
+    return upcoming.events;
+  }
+  return refreshUpcoming();
 }

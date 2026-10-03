@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { useQueue } from "@/store/queue";
-import { getDraftArgs, interrupt, resolveInteraction, submit } from "./executor";
+import { amendPlanning, getDraftArgs, interrupt, resolveInteraction, submit } from "./executor";
 
 // JARVIS voice engine — a module singleton like the executor (no React state at 60 fps).
 //
@@ -164,6 +164,9 @@ let fetchAbort = new AbortController();
 let stopCurrent: (() => void) | undefined;
 let browserSpeaking = false;
 
+/** dev-only transcript of everything JARVIS said (window.__jarvisVoice.said) */
+const said: string[] = [];
+
 const enabled = () => get().output || get().live;
 
 /** Queue a line for JARVIS to speak (no-op while voice is off). */
@@ -171,6 +174,7 @@ export function say(text: string) {
   const clean = text.trim();
   if (!clean || typeof window === "undefined" || !enabled()) return;
   stopListening(); // half-duplex: never transcribe ourselves
+  if (process.env.NODE_ENV !== "production") said.push(`${new Date().toISOString().slice(11, 19)} ${clean}`);
   queue.push({ text: clean });
   prefetch();
   if (!pumping) void pump();
@@ -367,7 +371,16 @@ export function recognitionCtor(): (new () => Recognition) | undefined {
 
 let rec: Recognition | undefined;
 /** Pause after Tony's last word before the order is sent. */
-const END_OF_SPEECH_MS = 700;
+const END_OF_SPEECH_MS = 550;
+const INCOMPLETE = /\b(and|or|but|so|to|the|a|an|for|at|on|in|with|about|saying|say|that|like|my|send|tell|message|remind me|schedule|um+|uh+|er+|hmm+)$/i;
+
+/** Pre-open the TLS connections to ElevenLabs + Gemini while Tony is still talking. */
+let lastWarm = 0;
+export function warmUp() {
+  if (Date.now() - lastWarm < 20_000) return;
+  lastWarm = Date.now();
+  void fetch("/api/voice/warm", { method: "POST" }).catch(() => undefined);
+}
 let errorStreak: number[] = [];
 let announcedListening = false;
 
@@ -412,7 +425,10 @@ function listen() {
     allText = text;
     set({ heard: text });
     clearTimeout(silence);
-    silence = setTimeout(() => r.stop(), pendingInterim ? 2200 : END_OF_SPEECH_MS);
+    // Trailing "and / to / saying / um…" = Tony is mid-thought: give him longer.
+    const hanging = INCOMPLETE.test(text.trim());
+    silence = setTimeout(() => r.stop(), pendingInterim ? 2000 : hanging ? 1700 : END_OF_SPEECH_MS);
+    warmUp();
   };
   r.onerror = (e) => {
     if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
@@ -452,6 +468,11 @@ function listen() {
   }
 }
 
+let lastOrderAt = 0;
+const allOffered = new Set<string>();
+/** Narrator asked one question for a whole multi-step plan. */
+export const offerAll = (commandId: string) => allOffered.add(commandId);
+
 const YES = /^(yes|yeah|yep|yup|confirm(ed)?|go ahead|do it|proceed|affirmative|approved?|send it|make it so|sure|ok(ay)?|go|execute|authori[sz]e(d)?)\b/;
 const ALL = /\b(all|everything)\b/;
 const NO = /^(no|nope|cancel|abort|stop|stand down|negative|don'?t|belay)\b/;
@@ -475,8 +496,11 @@ export function hear(raw: string) {
     if (q.pending.type === "confirm") {
       if (/^skip/.test(norm)) return resolveInteraction(key, { type: "skip" });
       if (NO.test(norm)) return resolveInteraction(key, { type: "cancel" });
-      if (YES.test(norm) || /^(approve|confirm|authori[sz]e) all/.test(norm))
-        return resolveInteraction(key, { type: "approve", args: getDraftArgs(key), all: ALL.test(norm) });
+      if (YES.test(norm) || /^(approve|confirm|authori[sz]e) all/.test(norm)) {
+        // JARVIS asked "shall I go ahead with all of it?" → a plain "yes" authorises the lot
+        const all = ALL.test(norm) || allOffered.has(q.pending.commandId);
+        return resolveInteraction(key, { type: "approve", args: getDraftArgs(key), all });
+      }
       say("Say confirm, or cancel, sir.");
       return;
     }
@@ -496,6 +520,12 @@ export function hear(raw: string) {
   }
   // background noise / stray syllables — unless JARVIS just asked a question
   if (norm.length < 3 && !q.awaitingInputFor) return;
+  // Tony paused mid-sentence and carried on: merge into the order still being planned
+  if (Date.now() - lastOrderAt < 8000 && amendPlanning(text)) {
+    lastOrderAt = Date.now();
+    return;
+  }
+  lastOrderAt = Date.now();
   submit(text);
 }
 
@@ -568,7 +598,7 @@ export function initVoice(provider: Provider) {
     window.addEventListener("keydown", unlock);
   }
   if (process.env.NODE_ENV !== "production") {
-    (window as unknown as Record<string, unknown>).__jarvisVoice = { hear, say, hush, setLive, state: get, store: useVoice };
+    (window as unknown as Record<string, unknown>).__jarvisVoice = { hear, say, hush, setLive, state: get, store: useVoice, said };
   }
 }
 
