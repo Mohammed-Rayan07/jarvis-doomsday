@@ -423,7 +423,19 @@ Viewports: 1440×900, 1024×768, 390×844.
 
 ---
 
-## 13. Submission checklist
+## 13. Skeleton status (commit `b8a1f54`) & known TODOs
+
+**Working now:** build + lint clean · HUD shell (status bar, arc reactor, split panes, mobile toggle) · chat + suggestion chips · `/api/plan` with LLM planner (needs key) and backup brain · client executor (queue / interrupt / Ctrl+Enter / STOP / clarify loop / confirm card / templating / per-step status / preview focus / action log) · reminders store + tools (end-to-end) · LOG tab · `/api/status` · Google OAuth routes + encrypted session · JSON storage · error envelopes.
+
+**Stubbed (throw `NOT_IMPLEMENTED`, surfaced as themed errors):** calendar.ts (P2), drive.ts + UploadCard + proxy upload (P4), telegram send/sync (P5), Calendar/Reminders/Archive/Comms views (P2–P5), Redis adapter (P8).
+
+**Known TODOs found during smoke test:**
+- `fallback.ts`: chrono parses in server TZ → pass `{ instant: now, timezone: offsetMinutes(tz) }`; strip trailing punctuation/whitespace from reminder text ("check the reactor ." bug).
+- `/api/plan`: inject next-14-days events once P2 lands.
+- ConfirmCard: typed editors + Enter/Esc keys (P6).
+- `telegram.send` should report `NOT_CONFIGURED` before `NOT_IMPLEMENTED`.
+
+## 14. Submission checklist
 - [ ] Public repo, `README.md` top: demo video link, live URL, rubric table, screenshots/GIF
 - [ ] Setup guide: Google Cloud (enable Calendar + Drive APIs, OAuth consent *Testing*, add test user, Web client, redirect URIs for localhost + Vercel), BotFather, env vars
 - [ ] `.env.example`, no secrets committed (`git log -p | grep -i key` sanity)
