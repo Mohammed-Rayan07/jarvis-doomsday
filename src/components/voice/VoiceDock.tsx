@@ -20,7 +20,8 @@ export function VoiceDock() {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== "Space" || e.repeat) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.closest("input, textarea, select, button, [contenteditable=true]") || t.isContentEditable)) return;
+      // only text entry keeps Space; on buttons it would "click" them (e.g. toggle LIVE off)
+      if (t && (t.closest("input, textarea, select, [contenteditable=true]") || t.isContentEditable)) return;
       e.preventDefault();
       bargeIn();
     };

@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { useQueue } from "@/store/queue";
-import { interrupt, resolveInteraction, submit } from "./executor";
+import { getDraftArgs, interrupt, resolveInteraction, submit } from "./executor";
 
 // JARVIS voice engine — a module singleton like the executor (no React state at 60 fps).
 //
@@ -221,8 +221,20 @@ async function pump() {
     try {
       const res = u.audio ? await u.audio : null;
       if (gen !== generation) continue;
-      if (res?.body) await playStream(res, u.text, gen);
-      else await browserSay(u.text, gen);
+      // watchdog: a stalled stream or a silently dropped utterance must never leave LIVE deaf
+      const play = res?.body ? playStream(res, u.text, gen) : browserSay(u.text, gen);
+      const limit = Math.max(4000, u.text.length * 110) + 2000;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = await Promise.race([
+        play.then(() => false),
+        new Promise<boolean>((r) => (timer = setTimeout(() => r(true), limit))),
+      ]);
+      clearTimeout(timer);
+      if (timedOut) {
+        stopCurrent?.();
+        if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+        browserSpeaking = false;
+      }
     } catch {
       /* a failed line shouldn't kill the queue */
     }
@@ -355,7 +367,7 @@ export function recognitionCtor(): (new () => Recognition) | undefined {
 
 let rec: Recognition | undefined;
 /** Pause after Tony's last word before the order is sent. */
-const END_OF_SPEECH_MS = 1100;
+const END_OF_SPEECH_MS = 700;
 let errorStreak: number[] = [];
 let announcedListening = false;
 
@@ -442,7 +454,7 @@ function listen() {
 
 const YES = /^(yes|yeah|yep|yup|confirm(ed)?|go ahead|do it|proceed|affirmative|approved?|send it|make it so|sure|ok(ay)?|go|execute|authori[sz]e(d)?)\b/;
 const ALL = /\b(all|everything)\b/;
-const NO = /^(no|nope|cancel|abort|stop|stand down|negative|don'?t|belay)/;
+const NO = /^(no|nope|cancel|abort|stop|stand down|negative|don'?t|belay)\b/;
 const STOP = /^(stop|cancel|abort|stand down|belay that|never ?mind|hold on)( that| it| everything)?$/;
 
 /**
@@ -464,7 +476,7 @@ export function hear(raw: string) {
       if (/^skip/.test(norm)) return resolveInteraction(key, { type: "skip" });
       if (NO.test(norm)) return resolveInteraction(key, { type: "cancel" });
       if (YES.test(norm) || /^(approve|confirm|authori[sz]e) all/.test(norm))
-        return resolveInteraction(key, { type: "approve", all: ALL.test(norm) });
+        return resolveInteraction(key, { type: "approve", args: getDraftArgs(key), all: ALL.test(norm) });
       say("Say confirm, or cancel, sir.");
       return;
     }

@@ -36,10 +36,16 @@ export function getAttachments() {
   return attachments;
 }
 
+/** Args as currently edited in an open ConfirmCard — so a spoken "confirm" keeps Tony's edits. */
+const drafts = new Map<string, Record<string, unknown>>();
+export const setDraftArgs = (stepKey: string, args: Record<string, unknown>) => drafts.set(stepKey, args);
+export const getDraftArgs = (stepKey: string) => drafts.get(stepKey);
+
 /** Called by ConfirmCard / UploadCard. */
 export function resolveInteraction(stepKey: string, outcome: InteractionOutcome) {
   waiters.get(stepKey)?.(outcome);
   waiters.delete(stepKey);
+  drafts.delete(stepKey);
 }
 
 function waitForInteraction(commandId: string, stepId: string, type: "confirm" | "upload", signal: AbortSignal) {

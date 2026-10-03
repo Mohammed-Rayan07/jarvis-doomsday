@@ -162,7 +162,10 @@ function CommandInput() {
         />
         {liveSupported && (
           <button
-            onClick={() => void setLive(!live)}
+            onClick={(e) => {
+              e.currentTarget.blur(); // keep Space free for barge-in
+              void setLive(!live);
+            }}
             aria-label={live ? "End voice link" : "Start live voice link"}
             title={live ? "End live voice link" : "LIVE: talk to JARVIS hands-free"}
             className={cn(

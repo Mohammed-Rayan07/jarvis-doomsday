@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { resolveInteraction } from "@/engine/executor";
+import { resolveInteraction, setDraftArgs } from "@/engine/executor";
 import { toolMeta } from "@/lib/tools/schemas";
 import type { StepRun } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -54,7 +54,8 @@ export function ConfirmCard({ commandId, step, remaining = 0 }: { commandId: str
   const argsRef = useRef(args);
   useEffect(() => {
     argsRef.current = args;
-  }, [args]);
+    setDraftArgs(key, args);
+  }, [args, key]);
 
   const approve = (all = false) => resolveInteraction(key, { type: "approve", args, all });
 
