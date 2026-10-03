@@ -508,6 +508,7 @@ export function hear(raw: string) {
       // not a yes/no: Tony is still finishing the order he started — fold it in and re-plan
       if (Date.now() - lastOrderAt < 10_000 && amendPlanning(text)) {
         lastOrderAt = Date.now();
+        hush(); // drop the held-back prompt for the superseded plan
         return;
       }
       say("Say confirm, or cancel, sir.");
@@ -532,6 +533,7 @@ export function hear(raw: string) {
   // Tony paused mid-sentence and carried on: merge into the order still being planned
   if (Date.now() - lastOrderAt < 8000 && amendPlanning(text)) {
     lastOrderAt = Date.now();
+    hush(); // anything queued for the superseded plan is stale
     return;
   }
   lastOrderAt = Date.now();

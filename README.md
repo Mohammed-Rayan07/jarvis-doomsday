@@ -42,7 +42,7 @@ Press **LIVE** (Chrome / Edge) and just talk: *"Jarvis, what's on my schedule to
 - **Half-duplex by design.** The mic pauses while JARVIS talks, so it never transcribes itself. Press **Space** or tap the core to interrupt it.
 - **The visuals react to the audio.** A canvas orb draws the live frequency spectrum (green while JARVIS speaks, cyan while you do). There's a live transcript and a typewriter caption, and the header reactor pulses with the voice.
 - **Talks like a person, not a log.** Lookups get one composed answer ("Tomorrow you have two things: the gamma reactor review at 4 PM and the Stark team meeting at 6 PM."). Multi-step plans ask once: "…shall I go ahead with all of it?" If you pause mid-order, the pieces merge into one command.
-- **About 2 s from your last word to JARVIS's voice.** Keep-alive connections to Gemini and ElevenLabs, a warm-up the moment you start talking, a cached calendar context, and no "fetching…" preambles.
+- **About 2 s from the moment your order is recognised to JARVIS's voice.** Keep-alive connections to Gemini and ElevenLabs, a warm-up the moment you start talking, a cached calendar context, and no "fetching…" preambles.
 - **Budget-safe.** Repeated lines are served from a disk cache for free, a character budget caps spend, and anything that goes wrong (no key, quota, rate limit) falls back to the browser's voice automatically.
 
 ## How it works
