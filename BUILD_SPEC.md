@@ -466,12 +466,34 @@ P6 Task 5 (verified): multi-step + Authorise all, queue/interrupt, clarify → c
 - Mid-sentence fragments merge into the command still being planned (`amendPlanning`).
 - Prompt now asks for spoken-style replies and direct clarify questions, and "a test message" no longer triggers a clarify.
 - Default voice is George, with stability 0.38 and speed 1.07.
+**P10 Full rubric audit, 3 Oct night (every spec bullet re-run against real Google and Telegram):**
+- Verified:
+  - 1.1 desktop and mobile
+  - 1.2 every example, plus queue and interrupt
+  - 2.1 create with description, missing time → clarify, singular "the meeting" with several matches → "which one?"
+  - 2.2 all three examples
+  - 3.1 new-folder upload with progress, explorer, direct-PUT failure → proxy fallback, hard failure → Retry or Give up
+  - 3.2 search fields
+  - 4.1 send, unknown recipient → options, missing content → clarify
+  - 4.2 comms log
+  - 5.1 flagship with Authorise all
+  - 5.2 unconfigured (now NOT_CONFIGURED, not "connect"), auth expired (simulated revoked token), missing field, invalid event, upload fail, send fail
+- Fixes:
+  - Drive search was 2–13 s; now about 1 s, using a folder index, ranking and a cache.
+  - Withdrawn commands leaked into the next plan.
+  - Invented message text.
+  - Upload misread as a search.
+  - Delete-all on a singular reference.
+  - Raw ids on confirm cards.
+  - Mobile command bar.
+- A clean clone builds, lints and boots with zero config.
+- `npm run demo:reset` clears demo data.
 - Demo tip: record LIVE mode with headphones, or speakers at low volume; Chrome or Edge only (Web Speech recognition).
 
 ## 14. Submission checklist
 - [ ] Public repo, `README.md` top: demo video link, live URL, rubric table, screenshots/GIF
 - [ ] Setup guide: Google Cloud (enable Calendar + Drive APIs, OAuth consent *Testing*, add test user, Web client, redirect URIs for localhost + Vercel), BotFather, env vars
-- [ ] `.env.example`, no secrets committed (`git log -p | grep -i key` sanity)
+- [x] `.env.example`, no secrets committed (`git log -p | grep -i key` sanity)
 - [ ] Commits inside event window, meaningful messages
-- [ ] `npm run build` clean, `npm run lint` clean
+- [x] `npm run build` clean, `npm run lint` clean (verified from a fresh clone, 3 Oct)
 - [ ] Submitted URL on portal before 17:30
