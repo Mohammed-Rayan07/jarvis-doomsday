@@ -52,6 +52,14 @@ export function StatusBar() {
         <Chip label="ARCHIVE" state={status?.google.connected ? "ok" : status?.google.configured ? "warn" : "off"} />
         <Chip label="TELEGRAM" state={status?.telegram.ok ? "ok" : status?.telegram.configured ? "warn" : "off"} title={status?.telegram.error} />
       </div>
+      {status?.google.configured && !status.google.connected && (
+        <a href="/api/auth/google" className="hud-label ml-auto rounded-sm border border-cyan/60 px-2 py-1.5 text-[0.6rem] text-cyan hover:bg-cyan/10 md:ml-2">
+          Connect Google
+        </a>
+      )}
+      {status?.google.connected && (
+        <span className="hud-label hidden text-[0.55rem] text-muted xl:inline" title="Google account">{status.google.email}</span>
+      )}
       <span className="ml-auto font-mono text-xs text-muted md:ml-3">{clock}</span>
     </header>
   );

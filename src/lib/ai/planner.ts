@@ -2,7 +2,7 @@ import "server-only";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { TOOL_NAMES, type Plan, type PlanRequest } from "../types";
-import { languageModel } from "./provider";
+import { markUnhealthy, modelChain } from "./provider";
 import { systemPrompt, type PlannerContext } from "./prompt";
 import { fallbackPlan } from "./fallback";
 
@@ -28,24 +28,40 @@ export const PlanSchema = z.object({
     .optional(),
 });
 
-const TIMEOUT_MS = 15_000;
+const PER_MODEL_TIMEOUT_MS = 12_000;
+const TOTAL_BUDGET_MS = 25_000;
 
 export async function plan(req: PlanRequest, ctx: PlannerContext): Promise<Plan> {
-  const model = languageModel();
-  if (!model) return { ...fallbackPlan(req), source: "backup" };
+  const chain = modelChain();
+  if (!chain.length) return { ...fallbackPlan(req), source: "backup" };
 
-  try {
-    const { output } = await generateText({
-      model,
-      system: systemPrompt(ctx),
-      messages: [...req.history, { role: "user" as const, content: req.text }],
-      output: Output.object({ schema: PlanSchema }),
-      temperature: 0,
-      abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    return { ...(output as Plan), source: "llm" };
-  } catch (err) {
-    console.error("[planner] LLM failed, using backup brain:", err);
-    return { ...fallbackPlan(req), source: "backup" };
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  const system = systemPrompt(ctx);
+  const messages = [...req.history, { role: "user" as const, content: req.text }];
+
+  for (const { id, model } of chain) {
+    const remaining = deadline - Date.now();
+    if (remaining < 2_000) break;
+    const started = Date.now();
+    try {
+      const { output } = await generateText({
+        model,
+        system,
+        messages,
+        output: Output.object({ schema: PlanSchema }),
+        temperature: 0,
+        maxRetries: 0, // we fail over to the next model instead of waiting on retries
+        // Planning is a fast structured task — keep Gemini "thinking" minimal for latency.
+        providerOptions: { google: { thinkingConfig: { thinkingLevel: "minimal" } } },
+        abortSignal: AbortSignal.timeout(Math.min(PER_MODEL_TIMEOUT_MS, remaining)),
+      });
+      console.info(`[planner] ${id} ok in ${Date.now() - started}ms`);
+      return { ...(output as Plan), source: "llm" };
+    } catch (err) {
+      markUnhealthy(id);
+      console.warn(`[planner] ${id} failed after ${Date.now() - started}ms:`, err instanceof Error ? err.message : err);
+    }
   }
+  console.error("[planner] all models failed, using backup brain");
+  return { ...fallbackPlan(req), source: "backup" };
 }

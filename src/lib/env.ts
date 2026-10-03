@@ -4,8 +4,9 @@ import "server-only";
 // app boots with zero env vars and reports what's missing instead of crashing.
 
 const v = (key: string) => {
-  const value = process.env[key];
-  return value && value.trim() !== "" ? value.trim() : undefined;
+  // Strip inline "# comments" defensively (copied from .env.example).
+  const value = process.env[key]?.replace(/(^|\s+)#.*$/, "").trim();
+  return value ? value : undefined;
 };
 
 export const env = {
