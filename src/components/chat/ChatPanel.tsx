@@ -48,7 +48,10 @@ export function ChatPanel() {
           const cmd = m.role === "jarvis" && m.kind !== "summary" ? commands.find((c) => c.id === m.commandId) : undefined;
           return (
             <div key={m.id} className={cn("max-w-[92%]", m.role === "user" ? "ml-auto text-right" : "")}>
-              <p className="hud-label mb-1 text-[0.55rem] text-muted">{m.role === "user" ? "Tony" : "JARVIS"}</p>
+              <p className="hud-label mb-1 text-[0.55rem] text-muted">
+                {m.role === "user" ? "Tony" : "JARVIS"}
+                {m.source && <span className={cn("ml-2", m.source === "llm" ? "text-cyan" : "text-gold")}>[{m.source}]</span>}
+              </p>
               <div
                 className={cn(
                   "inline-block rounded-sm border px-3 py-2 text-left text-sm",

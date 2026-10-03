@@ -103,7 +103,8 @@ async function run(commandId: string, clarificationAnswer?: string) {
       method: "POST",
       headers: { "content-type": "application/json", "x-jarvis-tz": tz() },
       body: JSON.stringify({
-        text: clarificationAnswer ?? cmd.text,
+        // Combine original order + answer so the backup brain (no history) can complete it too.
+        text: clarificationAnswer ? `${cmd.text} ${clarificationAnswer}` : cmd.text,
         history: history().slice(0, -1),
         tz: tz(),
         now: nowIso(),
@@ -123,6 +124,7 @@ async function run(commandId: string, clarificationAnswer?: string) {
       commandId,
       kind: plan.kind === "clarify" ? "clarify" : "text",
       options: plan.clarification?.options,
+      source: plan.source,
     });
 
     if (plan.kind === "clarify") {

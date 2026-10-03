@@ -15,6 +15,8 @@ export interface ChatMessage {
   commandId?: string;
   kind?: "text" | "clarify" | "error" | "summary";
   options?: string[];
+  /** which brain produced the plan — surfaced so a silent LLM fallback is visible */
+  source?: "llm" | "backup";
 }
 
 /** Pending user decision the executor is awaiting (confirm card / upload card). */

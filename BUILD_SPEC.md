@@ -434,6 +434,9 @@ Viewports: 1440×900, 1024×768, 390×844.
 - `/api/plan`: inject next-14-days events once P2 lands.
 - ConfirmCard: typed editors + Enter/Esc keys (P6).
 - `telegram.send` should report `NOT_CONFIGURED` before `NOT_IMPLEMENTED`.
+- **P2 first thing:** verify OAuth cookies survive `Response.redirect` in `/api/auth/google` + callback (symptom: `auth_error=state_mismatch` or `connected:false`). Fix = `NextResponse.redirect()` + `res.cookies.set()`.
+- **First real-key run:** watch server logs for `[planner] LLM failed`; chat shows `[llm]`/`[backup]` per reply. If the provider rejects the open `args` record, switch `args` to a JSON string parsed in `/api/execute`. Add the promised one-shot repair retry.
+- **Deploy early (after P2), not at P8:** add prod redirect URI in Google Cloud; JSON store falls back to `/tmp` on Vercel (ephemeral) until the Redis adapter lands.
 
 ## 14. Submission checklist
 - [ ] Public repo, `README.md` top: demo video link, live URL, rubric table, screenshots/GIF
