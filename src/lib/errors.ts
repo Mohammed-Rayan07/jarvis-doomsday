@@ -53,7 +53,7 @@ export const errors = {
 };
 
 function label(i: Integration) {
-  return { google: "Google", telegram: "Telegram", ai: "AI core", storage: "storage" }[i];
+  return { google: "Google", telegram: "Telegram", ai: "AI core", storage: "storage", voice: "voice" }[i];
 }
 
 export function toErrorShape(err: unknown): JarvisErrorShape {

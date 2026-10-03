@@ -1,5 +1,6 @@
 import { aiInfo } from "@/lib/ai/provider";
-import { googleConfigured, telegramConfigured } from "@/lib/env";
+import { googleConfigured, telegramConfigured, voiceConfigured } from "@/lib/env";
+import { budget } from "@/lib/voice/elevenlabs";
 import { getMe } from "@/lib/telegram/bot";
 import { readGoogleSession } from "@/lib/session";
 import { storage } from "@/lib/storage";
@@ -31,6 +32,7 @@ export async function GET() {
     },
     telegram,
     storage: { adapter: storage().kind },
+    voice: voiceConfigured() ? { provider: "elevenlabs", budgetLeft: (await budget()).left } : { provider: "browser" },
   };
   return ok(status);
 }

@@ -429,6 +429,16 @@ Viewports: 1440×900, 1024×768, 390×844.
 P4 Drive (verified with real account): explorer with breadcrumbs/back, search (all-keywords-in-name → fullText → any-keyword) with name/type/folder path/modified/open link, UploadCard (attach/pick/drop, folder picker with full paths, new folder, default My Drive, resumable session + direct XHR PUT with % / bytes / speed, verify, cancel, retry, proxy fallback).
 **Gemini thinking:** Flash-Lite accepts `minimal`, Flash models only `low` — set per model (planning 1.5–2.7 s).
 **Planner guard:** same-day past times roll forward to tomorrow (models ignore the prompt rule).
+P6 Task 5 (verified): multi-step + Authorise all, queue/interrupt, clarify → contact/time options, typed error cards, backup brain covers every canonical command.
+**P9 Voice link (5.3 stretch, verified):** `POST /api/voice/tts` streams ElevenLabs (`eleven_flash_v2_5`, premade "Daniel"; library voices are paid-only → auto-fallback to the premade voice). There's a disk cache at `.data/tts/` (repeat lines are free, ~7 ms) and a char budget in `_meta` (`voice.charsUsed`, cap `ELEVENLABS_CHAR_BUDGET`). Quota, rate-limit or missing key → browser speechSynthesis.
+- Client `src/engine/voice.ts` holds:
+  - a serial speech queue that prefetches one line ahead
+  - MediaSource streaming through an AnalyserNode
+  - a half-duplex LIVE loop: continuous recognition with a 1.1 s end-of-speech timer, mic paused while JARVIS talks
+  - `hear()` routing: confirm / authorise all / skip / cancel / stop / mute / "that's all"
+- `narrator.ts` speaks plan replies, read results (the answers) and voice confirm prompts.
+- UI: VoiceDock (canvas spectrum orb, live transcript, typewriter caption) and a header reactor that pulses with `--vl`.
+- Barge-in is Space or clicking the core. Voice barge-in was deliberately not built, because speakers would loop back into the mic.
 
 ### Original skeleton status (commit `b8a1f54`)
 
@@ -444,6 +454,8 @@ P4 Drive (verified with real account): explorer with breadcrumbs/back, search (a
 - **P2 first thing:** verify OAuth cookies survive `Response.redirect` in `/api/auth/google` + callback (symptom: `auth_error=state_mismatch` or `connected:false`). Fix = `NextResponse.redirect()` + `res.cookies.set()`.
 - **First real-key run:** watch server logs for `[planner] LLM failed`; chat shows `[llm]`/`[backup]` per reply. If the provider rejects the open `args` record, switch `args` to a JSON string parsed in `/api/execute`. Add the promised one-shot repair retry.
 - **Deploy early (after P2), not at P8:** add prod redirect URI in Google Cloud; JSON store falls back to `/tmp` on Vercel (ephemeral) until the Redis adapter lands.
+
+- Demo tip: record LIVE mode with headphones, or speakers at low volume; Chrome or Edge only (Web Speech recognition).
 
 ## 14. Submission checklist
 - [ ] Public repo, `README.md` top: demo video link, live URL, rubric table, screenshots/GIF

@@ -30,6 +30,7 @@ export function BootSequence() {
     ["Stark calendar uplink", status ? (status.google.connected ? "LINKED" : "STANDBY") : "…", status?.google.connected ? "ok" : "warn"],
     ["Stark Archive (Drive)", status ? (status.google.connected ? "LINKED" : "STANDBY") : "…", status?.google.connected ? "ok" : "warn"],
     ["Comms grid (Telegram)", status ? (status.telegram.ok ? "LINKED" : "OFFLINE") : "…", status?.telegram.ok ? "ok" : "off"],
+    ["Voice synthesis matrix", status ? (status.voice?.provider === "elevenlabs" ? "NEURAL" : "BASIC") : "…", status?.voice?.provider === "elevenlabs" ? "ok" : "warn"],
     ["Doomsday protocol", "ARMED", "ok"],
   ];
 

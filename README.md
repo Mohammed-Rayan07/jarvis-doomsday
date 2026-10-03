@@ -30,7 +30,18 @@
 | **4.2** Communication history | Comms tab: recipient, summary (click to expand), timestamp, Delivered / Failed (with the reason), "via J.A.R.V.I.S." | `CommsView.tsx` |
 | **5.1** Unified command flow | A single request becomes N sequential steps. Later steps can use earlier results. Each step shows its own status (pending / awaiting / running / done / failed / skipped / cancelled), and the preview updates after every step. | `src/engine/executor.ts`, `StepTimeline.tsx` |
 | **5.2** Confirmation and errors | Consequential actions show a **confirmation card** with editable fields (date picker, message box). Keys: Enter / Esc. **Authorise all** covers multi-step plans, and deletes get danger styling. Typed errors (`NOT_CONFIGURED`, `NOT_CONNECTED`, `AUTH_EXPIRED`, `MISSING_FIELD`, `NOT_FOUND`, `AMBIGUOUS`, `PERMISSION_DENIED`, `RATE_LIMITED`, …) appear as cards with a fix button (Reconnect Google, invite link, Retry & continue). | `src/lib/errors.ts`, `ConfirmCard.tsx` |
-| **5.3** The Stark Interface | Doomsday-green HUD: corner-bracket panels, grid and scanlines, Orbitron / Chakra Petch / JetBrains Mono, arc reactor that spins faster while working, boot sequence, message animations, highlight pulses, **voice input and spoken replies**, action log. | `globals.css`, `components/hud/*` |
+| **5.3** The Stark Interface | Doomsday-green HUD: corner-bracket panels, grid and scanlines, Orbitron / Chakra Petch / JetBrains Mono, an arc reactor that spins faster while working and **pulses with JARVIS's voice**, boot sequence, message animations, highlight pulses, action log. **🎙 LIVE voice link**: talk to JARVIS hands-free and it answers in a neural British voice (ElevenLabs) with a real-time spectrum orb and live captions. | `globals.css`, `components/hud/*`, `components/voice/*`, `engine/voice.ts` |
+
+## 🎙 Live voice link
+
+Press **LIVE** (Chrome / Edge) and just talk: *"Jarvis, what's on my schedule tomorrow?"*
+
+- **Speech in.** Web Speech recognition runs continuously, and the order is sent after about 1 s of silence, so long multi-step orders aren't cut off mid-breath.
+- **Speech out.** ElevenLabs neural TTS is streamed through a server route (the key stays server-side) and played with MediaSource, so audio starts before the clip has finished generating. JARVIS speaks its reply **and the actual answers** (your agenda, search hits, delivery confirmations).
+- **Hands-free authorisation.** When a confirmation card is up, say **"confirm"**, **"authorise all"**, **"skip"** or **"cancel"**. Say **"stop"** to abort a running operation, and **"that's all"** to close the link.
+- **Half-duplex by design.** The mic pauses while JARVIS talks, so it never transcribes itself. Press **Space** or tap the core to interrupt it.
+- **The visuals react to the audio.** A canvas orb draws the live frequency spectrum (green while JARVIS speaks, cyan while you do). There's a live transcript and a typewriter caption, and the header reactor pulses with the voice.
+- **Budget-safe.** Repeated lines are served from a disk cache for free, a character budget caps spend, and anything that goes wrong (no key, quota, rate limit) falls back to the browser's voice automatically.
 
 ## How it works
 
@@ -64,6 +75,7 @@ npm run dev                  # http://localhost:3000
 | **AI (Gemini, free)** | Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Set `AI_PROVIDER=google` and `GOOGLE_GENERATIVE_AI_API_KEY=…` (Anthropic / OpenAI are also supported). |
 | **Google Calendar + Drive** | In Google Cloud: create a project, enable the **Calendar API** and **Drive API**, and set the OAuth consent screen to External / Testing with yourself as a **test user**. Create an OAuth client (Web) with redirect `http://localhost:3000/api/auth/google/callback`. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then click **Connect Google** in the header. |
 | **Telegram** | Get a token from @BotFather (`/newbot`) and set it as `TELEGRAM_BOT_TOKEN`. Everyone JARVIS should message must press **Start** on the bot. Open the **Comms** tab and hit **Sync**, then ⭐ your own chat for reminder pings. Add the bot to a group whose name contains "team" to enable "message the team". |
+| **Voice (optional)** | Create an [ElevenLabs](https://elevenlabs.io) API key with *Text to Speech* permission and set `ELEVENLABS_API_KEY`. The default voice is the premade "Daniel"; on paid plans `ELEVENLABS_VOICE_ID` can pick any voice. Without a key, JARVIS uses the browser's built-in voice. |
 | **Session** | Set `SESSION_SECRET` to 32+ random chars: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 ### Try these
@@ -78,4 +90,4 @@ npm run dev                  # http://localhost:3000
 
 ## Stack
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · AI SDK 7 (Gemini) · zod · zustand · googleapis (Calendar, Drive) · Telegram Bot API · chrono-node · jose
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · AI SDK 7 (Gemini) · zod · zustand · googleapis (Calendar, Drive) · Telegram Bot API · ElevenLabs TTS + Web Speech + Web Audio · chrono-node · jose

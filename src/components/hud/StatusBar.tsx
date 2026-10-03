@@ -53,6 +53,11 @@ export function StatusBar() {
         <Chip label={status?.ai.mode === "llm" ? "AI CORE" : "AI · BACKUP"} state={status?.ai.mode === "llm" ? "ok" : "warn"} title={status ? `${status.ai.provider}/${status.ai.model}` : undefined} />
         <Chip label="CALENDAR" state={status?.google.connected ? "ok" : status?.google.configured ? "warn" : "off"} />
         <Chip label="ARCHIVE" state={status?.google.connected ? "ok" : status?.google.configured ? "warn" : "off"} />
+        <Chip
+          label={status?.voice?.provider === "elevenlabs" ? "VOICE · NEURAL" : "VOICE · BASIC"}
+          state={status?.voice?.provider === "elevenlabs" ? "ok" : "warn"}
+          title={status?.voice?.provider === "elevenlabs" ? `ElevenLabs · ${status.voice.budgetLeft ?? "?"} chars of budget left` : "Browser speech synthesis"}
+        />
         <Chip label="TELEGRAM" state={status?.telegram.ok ? "ok" : status?.telegram.configured ? "warn" : "off"} title={status?.telegram.error} />
       </div>
       {status?.google.configured && !status.google.connected && (

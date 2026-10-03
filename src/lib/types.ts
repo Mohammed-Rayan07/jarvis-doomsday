@@ -24,7 +24,7 @@ export type ToolName = (typeof TOOL_NAMES)[number];
 
 export type PreviewTab = "calendar" | "reminders" | "drive" | "comms" | "log";
 
-export type Integration = "google" | "telegram" | "ai" | "storage";
+export type Integration = "google" | "telegram" | "ai" | "storage" | "voice";
 
 // ── Planning ────────────────────────────────────────────
 
@@ -226,4 +226,6 @@ export interface SystemStatus {
   google: { configured: boolean; connected: boolean; email?: string };
   telegram: { configured: boolean; ok: boolean; botUsername?: string; error?: string };
   storage: { adapter: "json" | "redis" };
+  /** JARVIS's speaking voice: ElevenLabs when configured, else the browser's speechSynthesis. */
+  voice: { provider: "elevenlabs" | "browser"; budgetLeft?: number };
 }

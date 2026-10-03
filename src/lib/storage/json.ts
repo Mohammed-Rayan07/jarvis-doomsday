@@ -4,7 +4,7 @@ import path from "node:path";
 import type { StorageAdapter } from "./index";
 
 // Vercel's filesystem is read-only except /tmp (ephemeral) — degrade instead of crashing.
-const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "jarvis-data") : path.join(process.cwd(), ".data");
+export const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "jarvis-data") : path.join(process.cwd(), ".data");
 
 // Serialise writes per file so rapid queued commands can't clobber each other.
 const locks = new Map<string, Promise<unknown>>();

@@ -6,7 +6,7 @@ import { PreviewPane } from "@/components/preview/PreviewPane";
 import { usePreview } from "@/store/preview";
 import { cn } from "@/lib/cn";
 import { useReminderWatcher } from "@/hooks/useReminderWatcher";
-import { useSpeakReplies } from "@/hooks/useVoice";
+import { useVoiceSystem } from "@/hooks/useVoice";
 import { BootSequence } from "@/components/hud/BootSequence";
 
 // Command centre: split-screen chat ⇄ live preview; segmented toggle on mobile (BUILD_SPEC §9.1).
@@ -16,7 +16,7 @@ export default function CommandCentre() {
   const unseen = usePreview((s) => s.unseen);
   const markSeen = usePreview((s) => s.markSeen);
   useReminderWatcher();
-  useSpeakReplies();
+  useVoiceSystem();
 
   return (
     <main className="mx-auto flex h-dvh max-w-[1600px] flex-col gap-3 p-2 md:p-4">

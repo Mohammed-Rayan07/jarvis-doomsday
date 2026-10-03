@@ -25,9 +25,16 @@ export const env = {
   telegramToken: v("TELEGRAM_BOT_TOKEN"),
   telegramOwnerChatId: v("TELEGRAM_OWNER_CHAT_ID"),
 
+  elevenKey: v("ELEVENLABS_API_KEY"),
+  elevenVoice: v("ELEVENLABS_VOICE_ID"),
+  elevenModel: v("ELEVENLABS_MODEL") ?? "eleven_flash_v2_5",
+  /** Hard cap on characters sent to ElevenLabs (cache hits are free). Free tier ≈ 10k credits/month. */
+  elevenBudget: Number(v("ELEVENLABS_CHAR_BUDGET") ?? 12000),
+
   upstashUrl: v("UPSTASH_REDIS_REST_URL"),
   upstashToken: v("UPSTASH_REDIS_REST_TOKEN"),
 };
 
 export const googleConfigured = () => Boolean(env.googleClientId && env.googleClientSecret);
 export const telegramConfigured = () => Boolean(env.telegramToken);
+export const voiceConfigured = () => Boolean(env.elevenKey);

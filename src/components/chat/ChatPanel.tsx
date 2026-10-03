@@ -1,12 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Paperclip, Send, Square, X } from "lucide-react";
+import { AudioLines, Mic, Paperclip, Send, Square, X } from "lucide-react";
 import { useQueue, selectQueued } from "@/store/queue";
 import { interrupt, submit } from "@/engine/executor";
 import { StepTimeline } from "./StepTimeline";
 import { cn } from "@/lib/cn";
 import { useShallow } from "zustand/react/shallow";
-import { useDictation } from "@/hooks/useVoice";
+import { useDictation, useLiveSupported } from "@/hooks/useVoice";
+import { hear, setLive, useVoice } from "@/engine/voice";
+import { VoiceDock } from "@/components/voice/VoiceDock";
 
 // COMMS LINK: transcript + step timelines + queue strip + command bar (BUILD_SPEC 1.1, 1.2, §5).
 
@@ -24,6 +26,7 @@ export function ChatPanel() {
   const messages = useQueue((s) => s.messages);
   const commands = useQueue((s) => s.commands);
   const scroller = useRef<HTMLDivElement>(null);
+  const live = useVoice((s) => s.live);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -78,6 +81,7 @@ export function ChatPanel() {
         })}
       </div>
       <QueueStrip />
+      {live && <VoiceDock />}
       <CommandInput />
     </section>
   );
@@ -118,7 +122,10 @@ function CommandInput() {
   const mode = useQueue((s) => s.mode);
   const setMode = useQueue((s) => s.setMode);
   const fileInput = useRef<HTMLInputElement>(null);
-  const dictation = useDictation(useCallback((spoken: string) => submit(spoken), []));
+  // spoken input goes through hear() so "confirm" / "cancel" / "stop" work by voice too
+  const dictation = useDictation(useCallback((spoken: string) => hear(spoken), []));
+  const live = useVoice((s) => s.live);
+  const liveSupported = useLiveSupported();
 
   const send = (interruptNow = false) => {
     submit(text, files, { interrupt: interruptNow });
@@ -153,7 +160,20 @@ function CommandInput() {
           className="min-w-0 flex-1 rounded-sm border border-line bg-black/40 px-3 py-2 text-sm outline-none placeholder:text-muted/70 focus:border-primary"
           aria-label="Command input"
         />
-        {dictation.supported && (
+        {liveSupported && (
+          <button
+            onClick={() => void setLive(!live)}
+            aria-label={live ? "End voice link" : "Start live voice link"}
+            title={live ? "End live voice link" : "LIVE: talk to JARVIS hands-free"}
+            className={cn(
+              "hud-label relative flex items-center gap-1 overflow-hidden rounded-sm border px-2 py-2 text-[0.6rem]",
+              live ? "live-sweep border-cyan bg-cyan/10 text-cyan" : "border-line text-muted hover:border-cyan/60 hover:text-cyan",
+            )}
+          >
+            <AudioLines className="size-3.5" /> Live
+          </button>
+        )}
+        {dictation.supported && !live && (
           <button
             onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
             aria-label={dictation.listening ? "Stop listening" : "Speak a command"}

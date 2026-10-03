@@ -1,5 +1,7 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
+import { bindLevel } from "@/engine/voice";
 
 export type ReactorState = "online" | "processing" | "awaiting" | "degraded" | "offline";
 
@@ -15,6 +17,9 @@ const COLORS: Record<ReactorState, string> = {
 export function ArcReactor({ state = "online", size = 40, className }: { state?: ReactorState; size?: number; className?: string }) {
   const color = COLORS[state];
   const speed = state === "processing" ? "1.2s" : "6s";
+  const core = useRef<HTMLDivElement>(null);
+  // --vl (0..1) is written by the voice engine each frame while JARVIS / Tony is talking.
+  useEffect(() => bindLevel(core.current), []);
   return (
     <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }} aria-hidden>
       <div
@@ -26,8 +31,13 @@ export function ArcReactor({ state = "online", size = 40, className }: { state?:
         style={{ borderColor: color, opacity: 0.5, animation: `spin-rev ${speed} linear infinite` }}
       />
       <div
+        ref={core}
         className="absolute inset-[32%] rounded-full"
-        style={{ background: `radial-gradient(circle, #fff 0%, ${color} 45%, transparent 75%)`, boxShadow: `0 0 18px ${color}` }}
+        style={{
+          background: `radial-gradient(circle, #fff 0%, ${color} 45%, transparent 75%)`,
+          boxShadow: `0 0 calc(18px + var(--vl, 0) * 34px) ${color}`,
+          transform: "scale(calc(1 + var(--vl, 0) * 0.7))",
+        }}
       />
     </div>
   );

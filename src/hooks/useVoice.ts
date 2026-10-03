@@ -1,101 +1,50 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueue } from "@/store/queue";
+import { initVoice, recognitionCtor, say, setOutput, useVoice } from "@/engine/voice";
+import { startNarration } from "@/engine/narrator";
+import { useStatus } from "@/store/status";
 
-// Voice I/O (BUILD_SPEC §9.2, stretch): Web Speech recognition for input, speechSynthesis for
-// JARVIS replies. Both degrade silently where the browser lacks support.
+// React glue for the voice engine (src/engine/voice.ts).
 
-const KEY = "jarvis-voice";
-
-type Recognition = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start: () => void;
-  stop: () => void;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-};
-
-function recognitionCtor(): (new () => Recognition) | undefined {
-  if (typeof window === "undefined") return undefined;
-  const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
-
-function pickVoice() {
-  const voices = speechSynthesis.getVoices();
-  return (
-    voices.find((v) => /en-GB/i.test(v.lang) && /male|daniel|george|arthur|ryan/i.test(v.name)) ??
-    voices.find((v) => /en-GB/i.test(v.lang)) ??
-    voices.find((v) => /^en/i.test(v.lang))
-  );
-}
-
+/** Speak a line if voice is on (reminder pings etc.). */
 export function speak(text: string) {
-  if (typeof speechSynthesis === "undefined") return;
-  try {
-    if (localStorage.getItem(KEY) !== "on") return;
-  } catch {
-    return;
-  }
-  const u = new SpeechSynthesisUtterance(text.replace(/J\.A\.R\.V\.I\.S\./g, "Jarvis"));
-  const v = pickVoice();
-  if (v) u.voice = v;
-  u.rate = 1.04;
-  u.pitch = 0.9;
-  speechSynthesis.speak(u);
+  say(text);
 }
 
-/** Speaks each new JARVIS chat message while voice output is on. */
-export function useSpeakReplies() {
-  const lastSpoken = useRef<string | undefined>(undefined);
-  useEffect(
-    () =>
-      useQueue.subscribe((s) => {
-        const last = s.messages.at(-1);
-        if (!last || last.role !== "jarvis" || last.id === lastSpoken.current) return;
-        lastSpoken.current = last.id;
-        speak(last.text);
-      }),
-    [],
-  );
+/** Mount once: restores the voice toggle, picks ElevenLabs vs browser, narrates the queue. */
+export function useVoiceSystem() {
+  const provider = useStatus((s) => s.status?.voice?.provider);
+  useEffect(() => {
+    initVoice(provider ?? "browser");
+  }, [provider]);
+  useEffect(() => startNarration(), []);
 }
 
 export function useVoiceToggle() {
-  const [on, setOn] = useState(false);
+  const on = useVoice((s) => s.output);
   const [supported, setSupported] = useState(false); // decided after mount to avoid hydration mismatch
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSupported("speechSynthesis" in window);
-    try {
-      setOn(localStorage.getItem(KEY) === "on");
-    } catch {
-      /* ignore */
-    }
+    setSupported("speechSynthesis" in window || "AudioContext" in window);
   }, []);
-  const toggle = useCallback(() => {
-    setOn((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(KEY, next ? "on" : "off");
-      } catch {
-        /* ignore */
-      }
-      if (next) speak("Voice systems online, sir.");
-      else speechSynthesis?.cancel();
-      return next;
-    });
-  }, []);
+  const toggle = useCallback(() => setOutput(!useVoice.getState().output), []);
   return { on, toggle, supported };
+}
+
+export function useLiveSupported() {
+  const [supported, setSupported] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSupported(!!recognitionCtor() && !!navigator.mediaDevices?.getUserMedia);
+  }, []);
+  return supported;
 }
 
 /** Push-to-talk dictation. Calls onFinal with the transcript when speech ends. */
 export function useDictation(onFinal: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
-  const rec = useRef<Recognition | null>(null);
+  const rec = useRef<{ stop: () => void } | null>(null);
   const [supported, setSupported] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
