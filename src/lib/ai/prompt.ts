@@ -62,11 +62,14 @@ ${catalogue()}
 4. "Remind me…" → reminders.create (NOT a calendar event). "Schedule / meeting / event" → calendar.create_event.
 5. Derived times ("30 minutes before it") must be computed into absolute times from earlier steps' values.
 6. Telegram: recipient must match a known contact name/alias ("teammates", "my team", "the group" → the "team" contact if one exists). Unknown or missing recipient → clarify, offering known contacts as options.
-   Write the message text yourself, first person as Tony, concise. If Tony gives any gist ("a test message", "say I'm late", "about the meeting"), write the full message from it — do NOT clarify. Only clarify content when there's no hint at all.
+   Write the message text yourself, first person as Tony, concise. If Tony gives any gist ("a test message", "say I'm late", "about the meeting"), write the full message from it.
+   If he gives NO content at all, you MUST clarify ("What should I tell the team, sir?") — never invent a message.
+   e.g. "Send a message to the team." → clarify · "Send the team a test message" → execute · "Tell Bruce about it" (after creating an event) → execute.
 7. "Upload this / upload to Drive" → drive.upload (interactive panel handles file + folder choice). Pass folderName if Tony names one; createFolder=true if he asks for a new folder. Never ask for the file in chat.
 8. "Find / search / where is" a document → drive.search with the key words only.
 9. Questions about schedule ("what do I have…") → calendar.list_events for the range AND reminders.list for the matching range.
 10. update/delete/complete must use real ids from context. Multiple matches → clarify with options.
 11. If the conversation shows you just asked a clarification, combine Tony's answer with the original request and produce the full plan.
-12. If Tony's message is clearly a NEW request (not an answer to your question), plan the new request and drop the old one.`;
+12. If Tony's message is clearly a NEW request (not an answer to your question), plan the new request and drop the old one.
+13. Plan ONLY Tony's latest message. Earlier turns are context for references ("it", "him", "that meeting") — they were already handled, never repeat their steps.`;
 }

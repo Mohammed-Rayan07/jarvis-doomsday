@@ -145,7 +145,7 @@ function CommandInput() {
           ))}
         </div>
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <input ref={fileInput} type="file" hidden onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
         <button onClick={() => fileInput.current?.click()} aria-label="Attach file" className="text-muted hover:text-violet">
           <Paperclip className="size-4" />
@@ -179,7 +179,7 @@ function CommandInput() {
               live ? "live-sweep border-cyan bg-cyan/10 text-cyan" : "border-line text-muted hover:border-cyan/60 hover:text-cyan",
             )}
           >
-            <AudioLines className="size-3.5" /> Live
+            <AudioLines className="size-3.5" /> <span className="hidden sm:inline">Live</span>
           </button>
         )}
         {dictation.supported && !live && (
@@ -187,7 +187,7 @@ function CommandInput() {
             onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
             aria-label={dictation.listening ? "Stop listening" : "Speak a command"}
             title={dictation.listening ? "Listening… click to stop" : "Speak a command"}
-            className={cn("rounded-full p-1", dictation.listening ? "mic-live bg-red/20 text-red" : "text-muted hover:text-cyan")}
+            className={cn("rounded-full p-1", liveSupported && "hidden sm:block", dictation.listening ? "mic-live bg-red/20 text-red" : "text-muted hover:text-cyan")}
           >
             <Mic className="size-4" />
           </button>
@@ -195,7 +195,7 @@ function CommandInput() {
         <button
           onClick={() => setMode(mode === "queue" ? "interrupt" : "queue")}
           title="QUEUE: new commands wait. INTERRUPT: new commands cancel the running one."
-          className={cn("hud-label rounded-sm border px-2 py-2 text-[0.6rem]", mode === "queue" ? "border-cyan/60 text-cyan" : "border-red/60 text-red")}
+          className={cn("hud-label rounded-sm border px-1.5 py-2 text-[0.55rem] sm:px-2 sm:text-[0.6rem]", mode === "queue" ? "border-cyan/60 text-cyan" : "border-red/60 text-red")}
         >
           {mode}
         </button>

@@ -54,7 +54,7 @@ const handlers: { [T in ToolName]: Handler<T> } = {
     return {
       ok: true,
       data: r,
-      message: `I'll remind you to ${r.text} at ${formatInTz(r.dueAt, tz)}, sir.`,
+      message: `Reminder set for ${formatInTz(r.dueAt, tz)}: ${r.text}.`,
       preview: { tab: "reminders", highlightId: r.id },
     };
   },

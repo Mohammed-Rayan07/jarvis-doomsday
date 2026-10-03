@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { refreshUpcoming } from "@/lib/google/calendar";
+import { warmDrive } from "@/lib/google/drive";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export async function POST() {
   if (env.googleAiKey)
     pings.push(fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", { headers: { "x-goog-api-key": env.googleAiKey } }).then((r) => r.arrayBuffer()));
   pings.push(refreshUpcoming()); // fresh planner context by the time Tony stops talking
+  pings.push(warmDrive()); // folder paths for search results (cached 2 min)
   await Promise.allSettled(pings);
   return new Response(null, { status: 204 });
 }

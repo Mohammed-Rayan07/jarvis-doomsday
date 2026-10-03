@@ -120,7 +120,13 @@ export function interrupt(reason = "Operation cancelled, sir.") {
  */
 function history(commandId: string): ChatTurn[] {
   const { messages, commands } = useQueue.getState();
-  const queued = new Set(commands.filter((c) => c.status === "queued" && c.id !== commandId).map((c) => c.id));
+  // skip commands still waiting (haven't happened yet) and ones interrupted before anything ran
+  // (Tony withdrew them — they'd otherwise be re-planned into this command)
+  const queued = new Set(
+    commands
+      .filter((c) => c.id !== commandId && (c.status === "queued" || (c.status === "cancelled" && !c.steps.some((st) => st.status === "done"))))
+      .map((c) => c.id),
+  );
   let end = messages.length;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user" && messages[i].commandId === commandId) {
@@ -248,7 +254,7 @@ async function executeSteps(commandId: string, startIndex: number, signal: Abort
             : `${done} of ${final.steps.length} operations completed.${failedStep ? ` "${failedStep.summary}" failed — ${failedStep.result?.message ?? "see above"}` : ""}`,
       at: nowIso(),
       commandId,
-      kind: status === "done" ? "summary" : "error",
+      kind: status === "done" || status === "cancelled" ? "summary" : "error", // Tony's own stand-down isn't a failure
     });
   }
   approveAll.delete(commandId);
